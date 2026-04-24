@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+/* ============================================
+   Study Friction AI — Design System
+   ============================================ */
+
+@theme {
+  /* Brand Colors */
+  --color-primary: #6C5CE7;
+  --color-primary-light: #A29BFE;
+  --color-primary-dark: #4834D4;
+  --color-accent: #00CEC9;
+  --color-accent-light: #55EFC4;
+  --color-danger: #FF6B6B;
+  --color-danger-light: #FF8A8A;
+  --color-warning: #FDCB6E;
+  --color-success: #00B894;
+
+  /* Dark Theme Surface Colors */
+  --color-surface-900: #0A0A1A;
+  --color-surface-800: #12122A;
+  --color-surface-700: #1A1A3A;
+  --color-surface-600: #24244A;
+  --color-surface-500: #2E2E5A;
+
+  /* Text Colors */
+  --color-text-primary: #F0F0FF;
+  --color-text-secondary: #A0A0C8;
+  --color-text-muted: #6868A0;
+
+  /* Brainrot Gradient */
+  --color-brainrot-start: #FF6B6B;
+  --color-brainrot-end: #EE5A24;
+
+  /* Focus Gradient */
+  --color-focus-start: #6C5CE7;
+  --color-focus-end: #00CEC9;
+
+  /* Spacing */
+  --spacing-18: 4.5rem;
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.5s ease-out;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-float: float 3s ease-in-out infinite;
+}
+
+/* Keyframes */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(108, 92, 231, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(108, 92, 231, 0.6); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Base Styles */
+body {
+  background-color: var(--color-surface-900);
+  color: var(--color-text-primary);
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glass Card */
+.glass-card {
+  background: rgba(18, 18, 42, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(108, 92, 231, 0.15);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(108, 92, 231, 0.3);
+  box-shadow: 0 8px 32px rgba(108, 92, 231, 0.1);
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-brainrot {
+  background: linear-gradient(135deg, var(--color-brainrot-start), var(--color-brainrot-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-800);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-500);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Friction AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="popup">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>Study Friction</h1>
+          <span class="subtitle">Attention OS</span>
+        </div>
+      </div>
+      <div class="status" id="status">Active</div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Focus Score</span>
+        <span class="stat-value" id="focusScore">--</span>
+      </div>
+      <div class="stat-card stat-card-danger">
+        <span class="stat-label">Brainrot</span>
+        <span class="stat-value" id="brainrotScore">--</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Reel Time</span>
+        <span class="stat-value" id="reelTime">00:00</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Tracked Sites</span>
+        <span class="stat-value" id="trackedCount">0</span>
+      </div>
+    </div>
+
+    <!-- Current Site -->
+    <div class="current-site" id="currentSite">
+      <span class="site-label">Current site</span>
+      <span class="site-value" id="siteName">Loading...</span>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <a href="../dashboard/index.html" target="_blank" class="btn btn-primary">Open Dashboard</a>
+      <a href="../dashboard/index.html#/chat" target="_blank" class="btn btn-secondary">AI Coach</a>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>v0.1.0</span>
+      <a href="#" id="settingsLink">Settings</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

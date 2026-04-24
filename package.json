@@ -1,0 +1,26 @@
+{
+  "name": "ai-friction-pomodoro",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
+    "chart.js": "^4.5.1",
+    "echarts": "^6.0.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.32",
+    "vue-echarts": "^8.0.1",
+    "vue-router": "^5.0.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "tailwindcss": "^4.2.4",
+    "vite": "^8.0.10"
+  }
+}
