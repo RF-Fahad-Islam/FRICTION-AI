@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 @import "tailwindcss";
 
 /* ============================================
@@ -121,4 +122,51 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-primary);
+}
+
+/* ============================================
+   Landing Page Overrides (FRICTION-AI design)
+   ============================================ */
+
+/* Grayscale friction engine variable */
+:root {
+  --page-grayscale: 0%;
+}
+
+/* font-serif = Playfair Display for the landing page */
+.font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Landing-specific float animations */
+@keyframes float-landing {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(4deg); }
+}
+@keyframes float-reverse-landing {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(15px) rotate(-4deg); }
+}
+
+.animate-float { animation: float-landing 6s ease-in-out infinite; }
+.animate-float-fast { animation: float-landing 4s ease-in-out infinite; }
+.animate-float-reverse { animation: float-reverse-landing 7s ease-in-out infinite; }
+
+/* Landing gradient animation */
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientMove 3s ease infinite;
+}
+
+/* Landing page body override (white background) */
+.landing-page {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  filter: grayscale(var(--page-grayscale));
+  transition: filter 0.1s ease-out;
 }

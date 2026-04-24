@@ -7,11 +7,10 @@ const route = useRoute()
 const router = useRouter()
 const isSidebarCollapsed = ref(false)
 
-const isAuthOrLandingPage = computed(() => route.path === '/' || route.path === '/login')
+const isAuthPage = computed(() => route.path === '/' || route.path === '/login')
 
 const navItems = [
   { path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
-  { path: '/analytics', icon: 'analytics', label: 'Analytics' },
   { path: '/insights', icon: 'insights', label: 'Insights' },
   { path: '/chat', icon: 'chat', label: 'AI Coach' },
 ]
@@ -20,7 +19,7 @@ const navItems = [
 <template>
   <div class="flex h-screen overflow-hidden bg-surface-900">
     <!-- Sidebar -->
-    <aside v-if="!isAuthOrLandingPage"
+    <aside v-if="!isAuthPage"
       class="flex flex-col border-r border-white/5 bg-surface-800 transition-all duration-300 relative"
       :class="isSidebarCollapsed ? 'w-16' : 'w-60'"
     >
@@ -78,7 +77,7 @@ const navItems = [
 
       <!-- Logout Button -->
       <button
-        @click="supabase.auth.signOut()"
+        @click="() => { localStorage.removeItem('sf_is_authenticated'); router.push('/login'); }"
         class="p-3 border-t border-white/5 text-red-400 hover:text-red-300 transition-colors cursor-pointer flex items-center justify-center gap-2"
         :title="isSidebarCollapsed ? 'Sign Out' : ''"
       >

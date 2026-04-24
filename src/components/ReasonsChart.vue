@@ -12,9 +12,10 @@ const option = ref(null)
 
 const REASON_LABELS = {
   procrastinating: 'Procrastinating',
-  mood_off: 'Mood Off',
-  boredom: 'Boredom',
-  break: 'Taking a Break'
+  mood_off: 'Mood is Off',
+  boredom: 'Just Boredom',
+  break: 'Planned Break',
+  learning: 'Actually Learning'
 }
 
 function loadData() {

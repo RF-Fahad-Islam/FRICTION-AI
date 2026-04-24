@@ -9,13 +9,26 @@ const profileStore = useProfileStore()
 const canvasRef = ref(null)
 let chartInstance = null
 
+const historyScores = ref([45, 62, 38, 71, 55, 30, 48])
+
+function fetchHistory() {
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    chrome.storage.local.get('sf_history_scores', (data) => {
+      if (data.sf_history_scores) {
+        historyScores.value = data.sf_history_scores
+        renderChart()
+      }
+    })
+  }
+}
+
 function renderChart() {
   if (!canvasRef.value) return
   if (chartInstance) chartInstance.destroy()
 
-  const scores = profileStore.profile?.history?.lastWeekScores || []
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].slice(0, Math.max(scores.length, 7))
-  const data = scores.length > 0 ? scores : [45, 62, 38, 71, 55, 30, 48] // demo data if empty
+  const scores = historyScores.value
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const data = scores
 
   const ctx = canvasRef.value.getContext('2d')
   const gradient = ctx.createLinearGradient(0, 0, 0, 300)
@@ -87,8 +100,11 @@ function renderChart() {
   })
 }
 
-onMounted(renderChart)
-watch(() => profileStore.profile?.history?.lastWeekScores, renderChart, { deep: true })
+onMounted(() => {
+  fetchHistory()
+  setInterval(fetchHistory, 5000) // Keep chart updated
+})
+watch(() => historyScores.value, renderChart, { deep: true })
 </script>
 
 <template>

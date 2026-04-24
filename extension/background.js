@@ -20,11 +20,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'BRAINROT_DETECTED':
       handleBrainrotDetected(msg.payload, sender.tab);
       break;
+    case 'GET_AI_PROMPT':
+      getDynamicAiPrompt(message.payload).then(sendResponse);
+      return true;
     case 'FRICTION_RESPONSE':
       logFrictionResponse(msg.payload);
       break;
     case 'LOG_SCROLL_REASON':
       logScrollReason(msg.payload);
+      break;
+    case 'UPDATE_REEL_COUNT':
+      chrome.storage.local.get('sf_reel_count', (data) => {
+        const total = (data.sf_reel_count || 0) + 1;
+        chrome.storage.local.set({ sf_reel_count: total });
+      });
+      if (currentSession) {
+        currentSession.reelCount = (currentSession.reelCount || 0) + 1;
+      }
       break;
     case 'GET_FRICTION_CONFIG':
       getFrictionConfig(msg.payload.url).then(sendResponse);
@@ -39,6 +51,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // Tab URL monitoring
 let activeTabInfo = { url: null, domain: null, isBrainrot: false };
+let currentSession = null; // { startTime, domain, duration, reelCount, reasons: [] }
 
 function extractDomain(url) {
   try {
@@ -92,6 +105,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Periodic tracking every 1 second
 setInterval(() => {
   if (activeTabInfo.domain) {
+    // 1. Update cumulative domain activity
     chrome.storage.local.get(['sf_daily_activity', 'sf_reel_time'], (data) => {
       let activity = data.sf_daily_activity || {};
       let reelTime = data.sf_reel_time || 0;
@@ -99,7 +113,6 @@ setInterval(() => {
       if (!activity[activeTabInfo.domain]) {
         activity[activeTabInfo.domain] = { timeSpent: 0, isBrainrot: activeTabInfo.isBrainrot };
       }
-      // Update brainrot status if necessary
       activity[activeTabInfo.domain].isBrainrot = activeTabInfo.isBrainrot || activity[activeTabInfo.domain].isBrainrot;
       activity[activeTabInfo.domain].timeSpent += 1;
       
@@ -112,8 +125,46 @@ setInterval(() => {
         sf_reel_time: reelTime
       });
     });
+
+    // 2. Global Session Tracking (All sites)
+    if (currentSession && currentSession.domain !== activeTabInfo.domain) {
+      endSession();
+    }
+
+    if (!currentSession) {
+      currentSession = {
+        startTime: new Date().toISOString(),
+        domain: activeTabInfo.domain,
+        url: activeTabInfo.url,
+        duration: 0,
+        reelCount: 0,
+        reasons: [],
+        isBrainrot: activeTabInfo.isBrainrot
+      };
+    }
+    currentSession.duration += 1;
+    if (activeTabInfo.isBrainrot) {
+      currentSession.isBrainrot = true;
+    }
+  } else if (currentSession) {
+    endSession();
   }
 }, 1000);
+
+async function endSession() {
+  if (!currentSession) return;
+  currentSession.endTime = new Date().toISOString();
+  
+  const data = await chrome.storage.local.get('sf_sessions');
+  const sessions = data.sf_sessions || [];
+  sessions.push(currentSession);
+  
+  // Keep last 100 sessions
+  if (sessions.length > 100) sessions.shift();
+  
+  await chrome.storage.local.set({ sf_sessions: sessions });
+  currentSession = null;
+}
 
 function checkUrl(url, tabId) {
   let isBrainrot = false;
@@ -148,27 +199,65 @@ async function handleBrainrotDetected(payload, tab) {
 }
 
 async function getFrictionConfig(url) {
-  const profile = (await chrome.storage.local.get('sf_profile')).sf_profile;
+  const profileData = await chrome.storage.local.get(['sf_profile', 'sf_reel_count', 'sf_reel_time', 'sf_scroll_reasons']);
+  const profile = profileData.sf_profile;
   const tolerance = profile?.behavior?.frictionTolerance || 2;
+  const reelCount = profileData.sf_reel_count || 0;
+  const reelTime = profileData.sf_reel_time || 0;
+  const reasons = profileData.sf_scroll_reasons || [];
+  const lastReason = reasons.length > 0 ? reasons[reasons.length - 1].reason : 'unknown';
 
-  // Simple friction level calculation
   let level = 2;
-  for (const p of BRAINROT_PATTERNS) {
-    if (p.pattern.test(url)) {
-      level = Math.min(tolerance + (p.score > 30 ? 1 : 0), 5);
-      break;
+  let aiMessage = "Baseline friction applied.";
+
+  // AI Decision Logic
+  const apiKey = profile?.preferences?.apiKey;
+  if (apiKey) {
+    try {
+      // For speed, we simulate the AI decision prompt but we could call an actual endpoint here
+      // Real implementation would fetch from a service or directly call Gemini
+      level = calculateAiFriction(reelCount, reelTime, lastReason, tolerance);
+      aiMessage = `AI adjusted friction to level ${level} based on your ${reelCount} reels.`;
+    } catch (e) {
+      level = calculateHeuristicFriction(url, tolerance);
     }
+  } else {
+    level = calculateHeuristicFriction(url, tolerance, reelCount);
+    aiMessage = `Adaptive friction (Level ${level}) active.`;
   }
 
   const configs = {
-    1: { scrollDelay: 200, overlayOpacity: 0.1, cooldown: 0, popup: null },
-    2: { scrollDelay: 500, overlayOpacity: 0.2, cooldown: 30, popup: 'intent' },
-    3: { scrollDelay: 1000, overlayOpacity: 0.4, cooldown: 60, popup: 'warning' },
-    4: { scrollDelay: 2000, overlayOpacity: 0.6, cooldown: 120, popup: 'warning' },
-    5: { scrollDelay: 5000, overlayOpacity: 0.8, cooldown: 300, popup: 'cooldown' },
+    1: { scrollDelay: 200, overlayOpacity: 0.1, cooldown: 0, popup: null, aiMessage },
+    2: { scrollDelay: 500, overlayOpacity: 0.2, cooldown: 30, popup: 'intent', aiMessage },
+    3: { scrollDelay: 1200, overlayOpacity: 0.4, cooldown: 60, popup: 'warning', aiMessage },
+    4: { scrollDelay: 2500, overlayOpacity: 0.6, cooldown: 120, popup: 'warning', aiMessage },
+    5: { scrollDelay: 5000, overlayOpacity: 0.8, cooldown: 300, popup: 'cooldown', aiMessage },
   };
 
   return { level, config: configs[level] || configs[2] };
+}
+
+function calculateAiFriction(reels, time, lastReason, tolerance) {
+  // Simulated AI logic: more reels + bad reason = higher friction
+  let base = tolerance;
+  if (reels > 15) base += 2;
+  else if (reels > 8) base += 1;
+  
+  if (['boredom', 'procrastinating'].includes(lastReason)) base += 1;
+  if (time > 1800) base += 1; // 30 mins
+  
+  return Math.min(Math.max(1, base), 5);
+}
+
+function calculateHeuristicFriction(url, tolerance, reels = 0) {
+  let level = tolerance;
+  for (const p of BRAINROT_PATTERNS) {
+    if (p.pattern.test(url)) {
+      level = Math.min(tolerance + (p.score > 30 ? 1 : 0) + (reels > 10 ? 1 : 0), 5);
+      break;
+    }
+  }
+  return level;
 }
 
 function logFrictionResponse(payload) {
@@ -187,4 +276,37 @@ function logScrollReason(payload) {
     if (reasons.length > 1000) reasons.splice(0, reasons.length - 1000); // keep last 1000 reasons
     chrome.storage.local.set({ sf_scroll_reasons: reasons });
   });
+  if (currentSession) {
+    currentSession.reasons = currentSession.reasons || [];
+    currentSession.reasons.push(payload.reason);
+  }
+}
+
+async function getDynamicAiPrompt({ reels, timeSpent }) {
+  const profile = (await chrome.storage.local.get('sf_profile')).sf_profile;
+  const apiKey = profile?.preferences?.apiKey;
+  const tone = profile?.preferences?.tone || 'balanced';
+  const reasons = (await chrome.storage.local.get('sf_scroll_reasons')).sf_scroll_reasons || [];
+  const lastReason = reasons.length > 0 ? reasons[reasons.length - 1].reason : 'unknown';
+
+  if (!apiKey) {
+    const fallbackPrompts = [
+      `You've watched ${reels} reels. Is your brain feeling a bit mushy yet?`,
+      `${reels} reels in ${Math.round(timeSpent / 60)} minutes. The scroll is winning.`,
+      `Stop at ${reels}. Don't let the algorithm consume your focus.`,
+      `That's ${reels} dopamine hits. Time to step back into reality.`,
+      `Your future self is watching you watch these ${reels} reels. Proceed?`
+    ];
+    return { text: fallbackPrompts[Math.floor(Math.random() * fallbackPrompts.length)] };
+  }
+
+  try {
+    const { frictionMessagePrompt } = await import('./services/aiPrompts.js');
+    const prompt = frictionMessagePrompt(reels, timeSpent, tone, lastReason);
+    const response = await callGemini(apiKey, prompt);
+    return { text: response.trim() };
+  } catch (e) {
+    console.error('AI Prompt Error:', e);
+    return { text: `You've hit ${reels} reels. Time to evaluate your intent.` };
+  }
 }

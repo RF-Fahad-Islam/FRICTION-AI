@@ -6,10 +6,13 @@ export const useActivityStore = defineStore('activity', () => {
   const dailyActivity = ref({})
   const todayBrainrotScore = ref(0)
   
+  const reelCount = ref(0)
+  
   function fetchStats() {
     if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.get(['sf_reel_time', 'sf_daily_activity'], (data) => {
+      chrome.storage.local.get(['sf_reel_time', 'sf_daily_activity', 'sf_reel_count', 'sf_history_scores'], (data) => {
         reelTime.value = data.sf_reel_time || 0
+        reelCount.value = data.sf_reel_count || 0
         dailyActivity.value = data.sf_daily_activity || {}
         
         let brainrotTime = 0
@@ -28,8 +31,23 @@ export const useActivityStore = defineStore('activity', () => {
         } else {
           todayBrainrotScore.value = 0
         }
+
+        // Update history in profile/local storage for the chart
+        updateHistoryScores(todayBrainrotScore.value)
       })
     }
+  }
+
+  function updateHistoryScores(currentScore) {
+    chrome.storage.local.get('sf_history_scores', (data) => {
+      let scores = data.sf_history_scores || [40, 45, 42, 38, 41, 39, 0] // Default with some variation
+      
+      // Update today's score (last element)
+      scores[scores.length - 1] = currentScore
+      
+      // Save back
+      chrome.storage.local.set({ sf_history_scores: scores })
+    })
   }
 
   onMounted(() => {
@@ -38,6 +56,6 @@ export const useActivityStore = defineStore('activity', () => {
   })
 
   return {
-    reelTime, dailyActivity, todayBrainrotScore, fetchStats
+    reelTime, reelCount, dailyActivity, todayBrainrotScore, fetchStats
   }
 })

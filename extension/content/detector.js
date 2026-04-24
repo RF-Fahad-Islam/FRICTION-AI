@@ -12,6 +12,10 @@
   let frictionConfig = null;
   let isActive = false;
   let checkInterval = null;
+  
+  function isContextValid() {
+    return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
+  }
 
   // Listen for activation from background
   chrome.runtime.onMessage.addListener((msg) => {
@@ -29,15 +33,18 @@
     scrollCount = 0;
 
     // Get friction config from background
-    chrome.runtime.sendMessage(
-      { type: 'GET_FRICTION_CONFIG', payload: { url: window.location.href } },
-      (response) => {
-        if (response) {
-          frictionConfig = response;
-          window.dispatchEvent(new CustomEvent('sf-friction-config', { detail: response }));
+    if (isContextValid()) {
+      chrome.runtime.sendMessage(
+        { type: 'GET_FRICTION_CONFIG', payload: { url: window.location.href } },
+        (response) => {
+          if (chrome.runtime.lastError) return;
+          if (response) {
+            frictionConfig = response;
+            window.dispatchEvent(new CustomEvent('sf-friction-config', { detail: response }));
+          }
         }
-      }
-    );
+      );
+    }
 
     // Monitor scrolling (use capture so friction.js doesn't hide it)
     window.addEventListener('scroll', onScroll, { passive: true, capture: true });
@@ -76,15 +83,17 @@
     const score = calculateScore(scrollCount, timeSpent);
 
     if (score >= 50) {
-      chrome.runtime.sendMessage({
-        type: 'BRAINROT_DETECTED',
-        payload: {
-          url: window.location.href,
-          score,
-          scrollCount,
-          timeSpent: Math.round(timeSpent),
-        },
-      });
+      if (isContextValid()) {
+        chrome.runtime.sendMessage({
+          type: 'BRAINROT_DETECTED',
+          payload: {
+            url: window.location.href,
+            score,
+            scrollCount,
+            timeSpent: Math.round(timeSpent),
+          },
+        });
+      }
 
       // Trigger friction UI
       window.dispatchEvent(new CustomEvent('sf-brainrot-alert', {
