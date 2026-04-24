@@ -67,7 +67,7 @@ Respond with ONLY valid JSON without markdown formatting:
       }
     ],
     generationConfig: {
-      maxOutputTokens: 300,
+      maxOutputTokens: 500,
       temperature: 0.5,
     }
   };
@@ -164,7 +164,7 @@ Respond with ONLY valid JSON format. Do NOT wrap the JSON in markdown code block
       }
     ],
     generationConfig: {
-      maxOutputTokens: 200,
+      maxOutputTokens: 500,
       temperature: 0.5,
       responseMimeType: "application/json",
     }
@@ -197,6 +197,40 @@ Respond with ONLY valid JSON format. Do NOT wrap the JSON in markdown code block
     generationConfig: {
       temperature: 0.2,
       responseMimeType: "application/json",
+    }
+  };
+}
+
+/**
+ * Prompt for generating dynamic friction messages (shaming/encouraging).
+ */
+export function frictionMessagePrompt(reels, timeSpent, tone, lastReason) {
+  return {
+    systemInstruction: {
+      role: 'system',
+      parts: [{ text: `You are a focus coach for Study Friction AI. The user is doomscrolling reels.
+Generate a short, impactful message to show on their screen to snap them out of the trance.
+
+Tone: ${tone} (strict: very direct/harsh, balanced: firm but helpful, chill: supportive/gentle)
+
+Context:
+- Reels watched: ${reels}
+- Time spent: ${Math.round(timeSpent / 60)} min
+- Last reason given for scrolling: ${lastReason}
+
+Rules:
+1. Keep it under 20 words.
+2. Be creative.
+3. Reference the specific number of reels (${reels}) to make it feel real.
+4. If tone is strict, be a bit mean about the "brainrot".
+5. Return ONLY the text message.` }]
+    },
+    contents: [
+      { role: 'user', parts: [{ text: `Generate a message for ${reels} reels.` }] }
+    ],
+    generationConfig: {
+      maxOutputTokens: 50,
+      temperature: 0.8,
     }
   };
 }

@@ -19,7 +19,7 @@ export async function classify(url, title = '', timeSpent = 0, scrollCount = 0, 
   if (apiKey) {
     try {
       const prompt = classifyPrompt(url, title, timeSpent, scrollCount);
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(prompt),
@@ -30,7 +30,7 @@ export async function classify(url, title = '', timeSpent = 0, scrollCount = 0, 
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
       let parsed = {};
       try {
-        parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+        parsed = parseJsonSafe(text);
       } catch (e) {
         console.warn('[Classifier] AI parse failed:', e.message);
       }
@@ -64,7 +64,7 @@ export async function summarizeLinks(links, category, apiKey = null) {
   }
   try {
     const prompt = summarizeLinksPrompt(links.map(l => ({ url: l.url, title: l.title })), category);
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(prompt),
@@ -75,15 +75,46 @@ export async function summarizeLinks(links, category, apiKey = null) {
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     let parsed = {};
     try {
-      parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      parsed = parseJsonSafe(text);
     } catch (e) {
       console.warn('[Classifier] JSON parse failed, returning fallback:', e.message);
-      return { summary: text.slice(0, 200) + "... (Summary generated but formatting failed)" };
+      return { summary: text.slice(0, 300) + "... (Summary generated but formatting was irregular)" };
     }
-    return { summary: parsed.summary || "Summary generation failed." };
+    return { summary: parsed.summary || text.slice(0, 300) };
   } catch (err) {
     console.warn('[Classifier] Summary failed:', err.message);
     return { summary: "Failed to generate summary." };
+  }
+}
+
+/**
+ * Robust JSON extraction from AI response.
+ */
+function parseJsonSafe(text) {
+  try {
+    // 1. Try direct parse
+    return JSON.parse(text.replace(/```json|```/g, '').trim());
+  } catch (e) {
+    // 2. Try to find JSON block
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (e2) {
+        // 3. Last ditch: if it's unterminated, try to close it
+        if (e2.message.includes('Unterminated') || e2.message.includes('Expected property name')) {
+          try {
+            // Very basic heuristic to close open brackets
+            let attempt = jsonMatch[0].trim();
+            if (attempt.endsWith(',')) attempt = attempt.slice(0, -1);
+            if (!attempt.endsWith('}')) attempt += '}';
+            return JSON.parse(attempt);
+          } catch (e3) { throw e3; }
+        }
+        throw e2;
+      }
+    }
+    throw e;
   }
 }
 
@@ -92,7 +123,7 @@ export async function batchClassifyLinks(links, apiKey = null) {
   
   try {
     const prompt = batchClassifyPrompt(links.map(l => ({ url: l.url, title: l.title })));
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(prompt),
@@ -104,7 +135,7 @@ export async function batchClassifyLinks(links, apiKey = null) {
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     let parsed = {};
     try {
-      parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      parsed = parseJsonSafe(text);
     } catch (e) {
       console.warn('[Classifier] Batch JSON parse failed:', e.message);
       return {};
