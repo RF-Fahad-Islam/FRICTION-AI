@@ -29,9 +29,14 @@
   // React to brainrot alerts
   window.addEventListener('sf-brainrot-alert', (e) => {
     if (isInCooldown || Date.now() < intentPopupCooldown) return;
-    const { score } = e.detail;
+    const { score, forceIntent } = e.detail;
 
     if (!config) return;
+
+    if (forceIntent) {
+      showIntentPopup(e.detail);
+      return;
+    }
 
     if (config.level >= 4) {
       showCooldownOverlay(e.detail);

@@ -26,6 +26,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'LOG_SCROLL_REASON':
       logScrollReason(msg.payload);
       break;
+    case 'REEL_WATCHED':
+      chrome.storage.local.get('sf_reels_watched', (data) => {
+        chrome.storage.local.set({ sf_reels_watched: (data.sf_reels_watched || 0) + 1 });
+      });
+      break;
     case 'GET_FRICTION_CONFIG':
       getFrictionConfig(msg.payload.url).then(sendResponse);
       return true; // async response
