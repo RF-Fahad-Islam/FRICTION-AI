@@ -1,20 +1,14 @@
 <script setup>
 import Card from './ui/card/Card.vue'
 import Button from './ui/button/Button.vue'
-import attentionImg from '@/assets/images/attention_interrupter.png'
+import MiniFeedDemo from './MiniFeedDemo.vue'
+import HeroHeader from './HeroHeader.vue'
 import dopamineImg from '@/assets/images/dopamine_fade.png'
 </script>
 
 <template>
-  <section class="container mx-auto px-6 pt-40 pb-24 flex flex-col items-center gap-16">
-    <div class="text-center max-w-3xl mb-8">
-      <h1 class="text-5xl md:text-7xl font-bold font-serif text-gray-900 tracking-tight mb-6">
-        Take back your time.
-      </h1>
-      <p class="text-xl text-gray-600">
-        Mindless scrolling steals hours. The Friction Engine puts intentionality back into your digital life.
-      </p>
-    </div>
+  <section class="container mx-auto px-6 pt-32 pb-24 flex flex-col items-center gap-16">
+    <HeroHeader />
 
     <!-- Card 1: Attention Interrupter -->
     <Card class="w-full max-w-5xl rounded-3xl overflow-hidden border-2 border-transparent hover:border-blue-500 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/20 group relative bg-white">
@@ -32,7 +26,7 @@ import dopamineImg from '@/assets/images/dopamine_fade.png'
           </div>
         </div>
         <div class="md:w-1/2 bg-blue-50 flex items-center justify-center p-8">
-          <img :src="attentionImg" alt="Attention Interrupter" class="w-full h-auto object-cover rounded-2xl shadow-sm mix-blend-multiply" />
+          <MiniFeedDemo />
         </div>
       </div>
     </Card>
