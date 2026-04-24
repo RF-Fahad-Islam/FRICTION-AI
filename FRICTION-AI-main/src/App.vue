@@ -1,11 +1,11 @@
 <script setup>
 import { watchEffect } from 'vue'
 import { useWindowScroll } from '@vueuse/core'
-import Header from '../components/landing/Header.vue'
-import HeroSection from '../components/landing/HeroSection.vue'
-import BentoGrid from '../components/landing/BentoGrid.vue'
-import FeatureShowcase from '../components/landing/FeatureShowcase.vue'
-import EfficiencyStats from '../components/landing/EfficiencyStats.vue'
+import Header from './components/Header.vue'
+import HeroSection from './components/HeroSection.vue'
+import BentoGrid from './components/BentoGrid.vue'
+import FeatureShowcase from './components/FeatureShowcase.vue'
+import EfficiencyStats from './components/EfficiencyStats.vue'
 
 const { y } = useWindowScroll()
 
@@ -13,6 +13,10 @@ const { y } = useWindowScroll()
 watchEffect(() => {
   // We want the grayscale to start at 0% at the top of the page (0px)
   // And reach 100% when scrolling down near the bottom of the second card (e.g. 1500px)
+  // The user requested: 
+  // "At 0px scroll, the entire page should be in full color (grayscale(0%))."
+  // "As the user scrolls down through the two cards, dynamically increase the grayscale."
+  
   const startScroll = 100;
   const endScroll = 1200;
   
