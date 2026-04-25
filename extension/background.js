@@ -8,7 +8,7 @@ import { generateFrictionProfile } from './logic/frictionProfile.js';
 import { frictionDecisionPrompt } from './services/aiPrompts.js';
 import { categorize, CATEGORIES, needsAiFallback } from './logic/categorizer.js';
 
-// Brainrot URL patterns
+// Brainrot URL patterns - sites that get friction applied
 const BRAINROT_PATTERNS = [
   { pattern: /instagram\.com\/(reels|reel)/, score: 50 },
   { pattern: /youtube\.com\/shorts/, score: 50 },
@@ -21,6 +21,44 @@ const BRAINROT_PATTERNS = [
   { pattern: /linkedin\.com\/feed/, score: 20 },
   { pattern: /twitch\.tv/, score: 30 },
 ];
+
+// Default blocked domains - these will be hard blocked
+const DEFAULT_BLOCKED_DOMAINS = [
+  'instagram.com',
+  'tiktok.com',
+  'twitter.com',
+  'x.com',
+  'facebook.com',
+  'reddit.com',
+  'youtube.com',
+];
+
+// Initialize default blocked domains on first run
+function initializeDefaults() {
+  chrome.storage.local.get('sf_profile', (data) => {
+    const profile = data.sf_profile || {};
+    const existingBlocked = profile?.preferences?.blockedDomains || [];
+    
+    // Add any missing default blocked domains
+    const newBlocked = [...new Set([...existingBlocked, ...DEFAULT_BLOCKED_DOMAINS])];
+    
+    if (newBlocked.length !== existingBlocked.length) {
+      chrome.storage.local.set({
+        sf_profile: {
+          ...profile,
+          preferences: {
+            ...profile?.preferences,
+            blockedDomains: newBlocked
+          }
+        }
+      });
+      console.log('[Friction] Added default blocked domains:', newBlocked);
+    }
+  });
+}
+
+// Run setup
+initializeDefaults();
 
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

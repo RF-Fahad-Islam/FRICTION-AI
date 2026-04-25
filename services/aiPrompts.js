@@ -117,11 +117,13 @@ ${sessionContext || 'No recent sessions'}
 Rules:
 1. Be encouraging but honest
 2. Reference the user's actual data when possible
-3. Keep responses under 100 words
-4. If the user wants to change a setting, include this on a new line at the end:
+3. Use **bold** for emphasis on key numbers/insights
+4. Use bullet points (-) for lists
+5. Keep responses under 100 words
+6. If the user wants to change a setting, include this on a new line at the end:
    ACTION:{"field":"value"}
    Valid actions: {"frictionTolerance":1-5}, {"tone":"strict|balanced|chill"}, {"pomodoroLength":number}, {"goal":"study|work|relax_balance"}
-5. Do NOT fabricate data the user doesn't have` }]
+7. Do NOT fabricate data the user doesn't have` }]
     },
     contents: [
       ...formattedHistory,
@@ -135,9 +137,9 @@ Rules:
 }
 
 /**
- * Parse AI response for actions.
+ * Parse AI response for actions and HTML formatting.
  * @param {string} responseText
- * @returns {{ text: string, actions: object[] }}
+ * @returns {{ text: string, actions: object[], html: string }}
  */
 export function parseAiResponse(responseText) {
   const lines = responseText.split('\n');
@@ -157,9 +159,20 @@ export function parseAiResponse(responseText) {
     }
   }
 
+  const text = textLines.join('\n').trim();
+  
+  // Convert markdown-like formatting to HTML
+  let html = text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code class="px-1.5 py-0.5 bg-white/10 rounded text-accent">$1</code>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/\n/g, '<br>');
+
   return {
-    text: textLines.join('\n').trim(),
+    text,
     actions,
+    html,
   };
 }
 

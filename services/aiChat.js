@@ -43,8 +43,8 @@ export async function sendMessage(message, apiKey = null) {
     applyActions(response.actions);
   }
 
-  // Save assistant message
-  appendChatMessage('assistant', response.text, response.actions);
+  // Save assistant message with HTML formatting
+  appendChatMessage('assistant', response.text, response.actions, response.html);
 
   return response;
 }
@@ -188,12 +188,13 @@ export function getChatHistory() {
 /**
  * Append a message to chat history.
  */
-function appendChatMessage(role, content, actions = []) {
+function appendChatMessage(role, content, actions = [], html = '') {
   storage.append(KEYS.CHAT_HISTORY, {
     id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
     role,
     content,
     actions,
+    html: html || content, // Use HTML or fall back to plain text
     timestamp: new Date().toISOString(),
   });
 }

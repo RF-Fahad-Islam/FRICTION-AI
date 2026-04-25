@@ -158,11 +158,33 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* Hide native navigation on Reels/Shorts to force scroll friction */
-ytd-shorts [id="navigation-button-up"],
-ytd-shorts [id="navigation-button-down"],
-div[data-pressable-container="true"] svg[aria-label="Next"],
-div[data-pressable-container="true"] svg[aria-label="Back"] {
+/* Hide native navigation and interaction buttons to force scroll friction and reduce dopamine */
+
+/* Sidebars / Navigation */
+a[href="/reels/"], 
+a[href="/reels/videos/"],
+ytd-guide-entry-renderer:has(a[href="/shorts/"]),
+ytd-mini-guide-entry-renderer:has(a[href="/shorts/"]),
+a[href*="/shorts/"] {
+  display: none !important;
+}
+
+/* Instagram Reels Interaction Buttons */
+.sf-hide-interactions [aria-label="Like"],
+.sf-hide-interactions [aria-label="Unlike"],
+.sf-hide-interactions [aria-label="Comment"],
+.sf-hide-interactions [aria-label="Direct"],
+.sf-hide-interactions [aria-label="Share Post"],
+.sf-hide-interactions [aria-label="Save"] {
+  display: none !important;
+}
+
+/* YouTube Shorts Interaction Buttons */
+.sf-hide-interactions ytd-reel-player-overlay-renderer #actions.ytd-reel-player-overlay-renderer,
+.sf-hide-interactions #like-button,
+.sf-hide-interactions #dislike-button,
+.sf-hide-interactions #comments-button,
+.sf-hide-interactions #share-button {
   display: none !important;
 }
 

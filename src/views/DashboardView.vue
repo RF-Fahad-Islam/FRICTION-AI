@@ -12,6 +12,7 @@ import BrainrotChart from '../components/BrainrotChart.vue'
 import ReasonsChart from '../components/ReasonsChart.vue'
 import AnalyticsMindMap from '../components/AnalyticsMindMap.vue'
 import SessionsList from '../components/SessionsList.vue'
+import SessionsChart from '../components/SessionsChart.vue'
 import HourlyReelsChart from '../components/HourlyReelsChart.vue'
 import FrictionProfile from '../components/FrictionProfile.vue'
 
@@ -23,11 +24,12 @@ const profileStore = useProfileStore()
 
 const tabs = [
   { id: 'overview', name: 'Intelligence', icon: '📊' },
+  { id: 'insights', name: 'Insights', icon: '🧠' },
   { id: 'history', name: 'History', icon: '🕒' },
   { id: 'sessions', name: 'Sessions', icon: '💻' },
   { id: 'settings', name: 'Settings', icon: '⚙️' }
 ]
-const activeTab = ref('overview') // 'overview' | 'sessions' | 'insights' | 'history' | 'settings'
+const activeTab = ref('overview')
 
 // Analytics Data
 const visits = ref([])
@@ -43,6 +45,17 @@ const blockedDomains = ref(profileStore.profile?.preferences?.blockedDomains || 
 onMounted(() => {
   visits.value = storage.get(KEYS.VISITS, [])
   tempApiKey.value = profileStore.profile?.preferences?.apiKey || ''
+
+  // Listen for storage changes from background script
+  if (typeof chrome !== 'undefined' && chrome.storage) {
+    chrome.storage.onChanged.addListener((changes) => {
+      Object.keys(changes).forEach(key => {
+        if (key === KEYS.VISITS) {
+          visits.value = changes[key].newValue
+        }
+      })
+    })
+  }
 })
 
 function saveApiKey() {
@@ -328,9 +341,12 @@ async function generateSummary(category) {
     <!-- Sessions Tab -->
     <div v-if="activeTab === 'sessions'" class="space-y-6 animate-fade-in">
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-text-primary">Recent Brainrot Sessions</h2>
-        <p class="text-sm text-text-muted italic">Every entry is a moment captured in the void.</p>
+        <h2 class="text-lg font-semibold text-text-primary">Recent Sessions</h2>
+        <p class="text-sm text-text-muted italic">Your browsing activity timeline.</p>
       </div>
+      <!-- Sessions Timeline Chart -->
+      <SessionsChart />
+      <!-- Sessions List -->
       <SessionsList />
     </div>
     <!-- Insights Tab -->

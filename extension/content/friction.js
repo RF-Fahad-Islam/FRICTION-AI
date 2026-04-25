@@ -36,11 +36,15 @@
 
       if (isReelPath(currentUrl)) {
         reelCount++;
+        if (config && config.level >= 2) {
+          document.body.classList.add('sf-hide-interactions');
+        }
         if (isContextValid()) {
           chrome.runtime.sendMessage({ type: 'UPDATE_REEL_COUNT', payload: { count: reelCount } }).catch(() => { });
         }
         checkIntentIntercept();
-
+      } else {
+        document.body.classList.remove('sf-hide-interactions');
       }
     }
   };
@@ -90,6 +94,14 @@
 
     config = newConfig;
 
+    // Toggle interaction visibility (Dopamine Desaturation)
+    const isReelPath = (url) => url.includes('/shorts/') || url.includes('/reels/') || url.includes('/reel/');
+    if (isReelPath(window.location.href) && config.level >= 2) {
+      document.body.classList.add('sf-hide-interactions');
+    } else {
+      document.body.classList.remove('sf-hide-interactions');
+    }
+
     // Heavy Scrolling with dynamic friction based on session time
     if (config.level >= 2) {
       const sessionTimeSeconds = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
@@ -103,6 +115,7 @@
     stopDopamineDesaturation();
     removeGrayscaleLock();
     removeTransparencyTimer();
+    document.body.classList.remove('sf-hide-interactions');
     config = null;
     sessionStartTime = null;
     reelCount = 0;

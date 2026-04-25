@@ -106,15 +106,17 @@ watch(() => chatStore.messages.length, () => nextTick(scrollToBottom))
       <template v-for="msg in chatStore.messages" :key="msg.id">
         <div class="flex" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
           <div
-            class="max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed"
+            class="max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed"
             :class="msg.role === 'user'
               ? 'bg-primary text-white rounded-br-md'
               : 'bg-surface-700 text-text-primary rounded-bl-md border border-white/5'"
           >
-            {{ msg.content }}
+            <!-- Use HTML for assistant messages if available -->
+            <span v-if="msg.role === 'assistant' && msg.html" v-html="msg.html"></span>
+            <span v-else>{{ msg.content }}</span>
             <!-- Actions indicator -->
-            <div v-if="msg.actions?.length > 0" class="mt-2 pt-2 border-t border-white/10 text-xs opacity-70">
-              Settings updated
+            <div v-if="msg.actions?.length > 0" class="mt-2 pt-2 border-t border-white/10 text-xs text-success">
+              ✓ Settings updated
             </div>
           </div>
         </div>
