@@ -21,7 +21,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       handleBrainrotDetected(msg.payload, sender.tab);
       break;
     case 'GET_AI_PROMPT':
-      getDynamicAiPrompt(message.payload).then(sendResponse);
+      getDynamicAiPrompt(msg.payload).then(sendResponse);
       return true;
     case 'FRICTION_RESPONSE':
       logFrictionResponse(msg.payload);
@@ -29,6 +29,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'LOG_SCROLL_REASON':
       logScrollReason(msg.payload);
       break;
+    case 'REEL_WATCHED':
     case 'UPDATE_REEL_COUNT':
       chrome.storage.local.get('sf_reel_count', (data) => {
         const total = (data.sf_reel_count || 0) + 1;

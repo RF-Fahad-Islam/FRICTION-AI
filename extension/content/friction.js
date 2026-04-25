@@ -126,35 +126,7 @@
     }
   });
 
-  let fillBarEl = null;
-  let isFillBarActive = false;
 
-  function createFillBar() {
-    if (!fillBarEl) {
-      fillBarEl = document.createElement('div');
-      fillBarEl.className = 'sf-scroll-fill-bar';
-      const inner = document.createElement('div');
-      inner.className = 'sf-scroll-fill-inner';
-      fillBarEl.appendChild(inner);
-      document.body.appendChild(fillBarEl);
-    }
-  }
-
-  function updateFillBar(progress, max) {
-    createFillBar();
-    fillBarEl.classList.add('sf-visible');
-    const inner = fillBarEl.querySelector('.sf-scroll-fill-inner');
-    const percentage = Math.min(100, Math.max(0, (progress / max) * 100));
-    inner.style.width = `${percentage}%`;
-  }
-
-  function hideFillBar() {
-    if (fillBarEl) {
-      fillBarEl.classList.remove('sf-visible');
-      const inner = fillBarEl.querySelector('.sf-scroll-fill-inner');
-      if (inner) inner.style.width = '0%';
-    }
-  }
 
   /** Apply scroll friction by capturing wheel/touch events and requiring physical distance */
   function applyScrollFriction(level) {
