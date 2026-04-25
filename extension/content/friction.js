@@ -40,8 +40,7 @@
           chrome.runtime.sendMessage({ type: 'UPDATE_REEL_COUNT', payload: { count: reelCount } }).catch(() => {});
         }
         checkIntentIntercept();
-        // Flow-Break: Lock scroll for 1.5s on every reel change
-        applyFlowBreak();
+        // Removed flow-break flash and lock as it caused jittery experience
       }
     }
   };
@@ -102,6 +101,8 @@
     stopDopamineDesaturation();
     removeGrayscaleLock();
     removeTransparencyTimer();
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
     config = null;
   });
 
@@ -134,8 +135,8 @@
     let scrollAccumulator = 0;
 
     blockScrollHandler = (e) => {
-      // Hard-lock if intercept is active
-      if (isScrollLocked) {
+      // Hard-lock if intercept is active or Level 5
+      if (isScrollLocked || (config && config.level === 5)) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -150,9 +151,8 @@
         const delta = Math.abs(e.deltaY);
         if (e.deltaY === 0) return;
 
-        // Sticky Friction: Apply a "Gravity Pull" in opposite direction
-        const resistanceScale = 0.05 * level;
-        window.scrollBy(0, -e.deltaY * resistanceScale);
+        // Removed Sticky Friction counter-scroll as it caused jittery "not smooth" scrolling
+        // Only accumulating delta now to show the fill bar progress
 
         scrollAccumulator += delta;
         const progress = Math.min(scrollAccumulator, requiredDelta);
@@ -179,8 +179,7 @@
         if (e.type === 'touchmove') {
           createFillBar();
           fillBarEl.classList.add('sf-visible');
-          // Add touch jitter
-          if (Math.random() > 0.8) window.scrollBy(0, (Math.random() - 0.5) * 10);
+          // Removed touch jitter for smoother experience
         }
       }
     };
@@ -198,10 +197,11 @@
       e.stopImmediatePropagation();
       return;
     }
-    const blockedKeys = ['ArrowUp', 'ArrowDown', 'Space', 'PageUp', 'PageDown'];
-    if (blockedKeys.includes(e.code)) {
+    const blockedKeys = ['ArrowUp', 'ArrowDown', 'Space', 'PageUp', 'PageDown', 'Home', 'End'];
+    if (blockedKeys.includes(e.code) || blockedKeys.includes(e.key)) {
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
       createFillBar();
       fillBarEl.classList.add('sf-visible');
       setTimeout(() => { if (!blockScrollHandler) hideFillBar(); }, 800);
@@ -429,17 +429,21 @@
   function showCooldownOverlay(data) {
     if (document.getElementById('sf-overlay')) return;
     isInCooldown = true;
-    let countdown = config?.config?.cooldown || 60;
+    let countdown = config?.config?.cooldown || 120;
+    
+    // Hide scrollbar during cooldown (loophole closure)
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
 
     overlayEl = createOverlay(`
       <div class="sf-card sf-card-cooldown">
         <div class="sf-icon">🧊</div>
-        <h2>Cooldown Active</h2>
-        <p class="sf-score">Score: <strong class="sf-danger">${data.score}</strong> — Take a breather.</p>
+        <h2>Focus Lockdown</h2>
+        <p class="sf-score">Score: <strong class="sf-danger">${data.score}</strong> — You are currently in a mandatory cooldown.</p>
         <div class="sf-countdown" id="sf-countdown">${formatTime(countdown)}</div>
-        <p class="sf-subtext sf-quote">"The ability to focus is the most important skill for the 21st century."</p>
+        <p class="sf-subtext sf-quote">"The only way to do great work is to love what you do."</p>
       </div>
-    `, 0.85);
+    `, 0.98); // Almost full opacity
 
     const countdownEl = overlayEl.querySelector('#sf-countdown');
     const timer = setInterval(() => {
@@ -448,6 +452,8 @@
       if (countdown <= 0) {
         clearInterval(timer);
         isInCooldown = false;
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
         removeOverlay();
       }
     }, 1000);
@@ -529,6 +535,9 @@
       el.classList.remove('sf-visible');
       setTimeout(() => el.remove(), 300);
     }
+    // Restore scrollbar just in case it was locked by Level 5 or Cooldown
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
     overlayEl = null;
   }
 
@@ -577,21 +586,5 @@
     if (previewEl) previewEl.classList.remove('sf-visible');
   }
 
-  function applyFlowBreak() {
-    if (isScrollLocked) return;
-    isScrollLocked = true;
-    
-    // Brief visual flash to signal the break
-    const flash = document.createElement('div');
-    flash.style.cssText = 'position:fixed;inset:0;background:rgba(108,92,231,0.1);z-index:2147483647;pointer-events:none;transition:opacity 0.5s;';
-    document.body.appendChild(flash);
-    
-    setTimeout(() => {
-      if (flash) {
-        flash.style.opacity = '0';
-        setTimeout(() => flash.remove(), 500);
-      }
-      isScrollLocked = false;
-    }, 1500); // 1.5s Flow Break
-  }
+  // Removed applyFlowBreak as it was too intrusive and caused blue overlay complaints
 })();

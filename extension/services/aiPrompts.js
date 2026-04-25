@@ -238,3 +238,43 @@ Rules:
     }
   };
 }
+/**
+ * Prompt for deciding the friction level dynamically based on behavior.
+ */
+export function frictionDecisionPrompt(metrics, profile) {
+  return {
+    systemInstruction: {
+      role: 'system',
+      parts: [{ text: `You are the Friction Intelligence Engine for Study Friction AI.
+Your job is to decide the optimal friction level (1-5) for a user based on their current behavior.
+
+Friction Levels:
+1: Gentle (slight resistance)
+2: Moderate (intent checks)
+3: Strong (warning overlays)
+4: Aggressive (cooldown periods)
+5: Maximum (full block)
+
+User Context:
+- Reels Watched: ${metrics.reels}
+- Time in Void: ${Math.round(metrics.timeSpent / 60)} min
+- Last Reason: ${metrics.lastReason}
+- User Friction Tolerance: ${profile?.behavior?.frictionTolerance || 2}
+
+Respond with ONLY valid JSON:
+{
+  "level": 1-5,
+  "reasoning": "one sentence explaining the decision",
+  "aiMessage": "A short coach message"
+}` }]
+    },
+    contents: [
+      { role: 'user', parts: [{ text: `Current state: ${metrics.reels} reels, ${metrics.timeSpent}s spent.` }] }
+    ],
+    generationConfig: {
+      maxOutputTokens: 100,
+      temperature: 0.3,
+      responseMimeType: "application/json",
+    }
+  };
+}

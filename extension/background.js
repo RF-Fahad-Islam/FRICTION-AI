@@ -3,15 +3,22 @@
  * Routes messages between content scripts, popup, and storage.
  */
 
+import { calculateFrictionLevel, FRICTION_LEVELS, calculateBrainrotScore } from './logic/adaptiveFriction.js';
+import { generateFrictionProfile } from './logic/frictionProfile.js';
+import { frictionDecisionPrompt } from './services/aiPrompts.js';
+
 // Brainrot URL patterns
 const BRAINROT_PATTERNS = [
-  { pattern: /instagram\.com\/reels/, score: 40 },
-  { pattern: /youtube\.com\/shorts/, score: 40 },
-  { pattern: /tiktok\.com/, score: 40 },
-  { pattern: /twitter\.com/, score: 25 },
-  { pattern: /x\.com/, score: 25 },
-  { pattern: /reddit\.com/, score: 20 },
-  { pattern: /facebook\.com\/(reel|reels|watch)/, score: 40 },
+  { pattern: /instagram\.com\/(reels|reel)/, score: 50 },
+  { pattern: /youtube\.com\/shorts/, score: 50 },
+  { pattern: /tiktok\.com/, score: 60 },
+  { pattern: /twitter\.com/, score: 35 },
+  { pattern: /x\.com/, score: 35 },
+  { pattern: /reddit\.com/, score: 30 },
+  { pattern: /facebook\.com\/(reel|reels|watch)/, score: 50 },
+  { pattern: /pinterest\.com/, score: 25 },
+  { pattern: /linkedin\.com\/feed/, score: 20 },
+  { pattern: /twitch\.tv/, score: 30 },
 ];
 
 // Listen for messages from content scripts
@@ -31,9 +38,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       break;
     case 'REEL_WATCHED':
     case 'UPDATE_REEL_COUNT':
-      chrome.storage.local.get('sf_reel_count', (data) => {
+      chrome.storage.local.get(['sf_reel_count', 'sf_hourly_reels'], (data) => {
         const total = (data.sf_reel_count || 0) + 1;
-        chrome.storage.local.set({ sf_reel_count: total });
+        const hourly = data.sf_hourly_reels || {};
+        
+        // Track by hour: YYYY-MM-DD-HH
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const day = now.getDate().toString().padStart(2, '0');
+        const hour = now.getHours().toString().padStart(2, '0');
+        const key = `${year}-${month}-${day}-${hour}`;
+        
+        hourly[key] = (hourly[key] || 0) + 1;
+        
+        // Keep only last 7 days of hourly data to prevent storage bloat
+        const keys = Object.keys(hourly).sort();
+        if (keys.length > 24 * 7) {
+          delete hourly[keys[0]];
+        }
+
+        chrome.storage.local.set({ 
+          sf_reel_count: total,
+          sf_hourly_reels: hourly
+        });
       });
       if (currentSession) {
         currentSession.reelCount = (currentSession.reelCount || 0) + 1;
@@ -164,7 +192,33 @@ async function endSession() {
   if (sessions.length > 100) sessions.shift();
   
   await chrome.storage.local.set({ sf_sessions: sessions });
+  
+  // Trigger Profile Update every 5 sessions or on brainrot end
+  if (currentSession.isBrainrot || sessions.length % 5 === 0) {
+    updateFrictionProfile(sessions);
+  }
+  
   currentSession = null;
+}
+
+async function updateFrictionProfile(sessions) {
+  const data = await chrome.storage.local.get(['sf_daily_activity', 'sf_profile']);
+  const dailyActivity = data.sf_daily_activity || {};
+  const profile = data.sf_profile || {};
+  
+  const newProfile = generateFrictionProfile(sessions, dailyActivity, profile);
+  
+  if (newProfile && newProfile.type !== profile.behavior?.type) {
+    profile.behavior = {
+      ...(profile.behavior || {}),
+      type: newProfile.type,
+      frictionTolerance: newProfile.adjustments.frictionTolerance,
+      peakDistractionTime: newProfile.adjustments.peakDistractionTime,
+      lastProfileUpdate: new Date().toISOString()
+    };
+    await chrome.storage.local.set({ sf_profile: profile });
+    console.log('Friction Profile Updated:', newProfile.type);
+  }
 }
 
 function checkUrl(url, tabId) {
@@ -197,45 +251,59 @@ async function handleBrainrotDetected(payload, tab) {
   });
   if (events.length > 200) events.splice(0, events.length - 200);
   await chrome.storage.local.set({ sf_friction_log: events });
+
+  // Update current friction level in storage based on detected score
+  const profile = (await chrome.storage.local.get('sf_profile')).sf_profile;
+  const { level } = calculateFrictionLevel(profile, payload.score);
+  await chrome.storage.local.set({ sf_current_friction_level: level });
 }
 
 async function getFrictionConfig(url) {
   const profileData = await chrome.storage.local.get(['sf_profile', 'sf_reel_count', 'sf_reel_time', 'sf_scroll_reasons']);
   const profile = profileData.sf_profile;
-  const tolerance = profile?.behavior?.frictionTolerance || 2;
   const reelCount = profileData.sf_reel_count || 0;
   const reelTime = profileData.sf_reel_time || 0;
   const reasons = profileData.sf_scroll_reasons || [];
   const lastReason = reasons.length > 0 ? reasons[reasons.length - 1].reason : 'unknown';
 
-  let level = 2;
-  let aiMessage = "Baseline friction applied.";
+  const metrics = {
+    reels: reelCount,
+    timeSpent: reelTime,
+    lastReason
+  };
 
-  // AI Decision Logic
+  const baseBrainrotScore = calculateBrainrotScore(metrics);
+  let level = 2;
+  let aiMessage = "Adaptive friction active.";
+
   const apiKey = profile?.preferences?.apiKey;
   if (apiKey) {
     try {
-      // For speed, we simulate the AI decision prompt but we could call an actual endpoint here
-      // Real implementation would fetch from a service or directly call Gemini
-      level = calculateAiFriction(reelCount, reelTime, lastReason, tolerance);
-      aiMessage = `AI adjusted friction to level ${level} based on your ${reelCount} reels.`;
+      const prompt = frictionDecisionPrompt(metrics, profile);
+      const response = await callGemini(apiKey, prompt);
+      const aiDecision = JSON.parse(response);
+      
+      level = aiDecision.level;
+      aiMessage = aiDecision.aiMessage || `AI set level ${level}: ${aiDecision.reasoning}`;
     } catch (e) {
-      level = calculateHeuristicFriction(url, tolerance);
+      console.warn('AI Friction Decision Failed, falling back to heuristics:', e);
+      const result = calculateFrictionLevel(profile, baseBrainrotScore);
+      level = result.level;
     }
   } else {
-    level = calculateHeuristicFriction(url, tolerance, reelCount);
-    aiMessage = `Adaptive friction (Level ${level}) active.`;
+    const result = calculateFrictionLevel(profile, baseBrainrotScore);
+    level = result.level;
   }
 
-  const configs = {
-    1: { scrollDelay: 200, overlayOpacity: 0.1, cooldown: 0, popup: null, aiMessage },
-    2: { scrollDelay: 500, overlayOpacity: 0.2, cooldown: 30, popup: 'intent', aiMessage },
-    3: { scrollDelay: 1200, overlayOpacity: 0.4, cooldown: 60, popup: 'warning', aiMessage },
-    4: { scrollDelay: 2500, overlayOpacity: 0.6, cooldown: 120, popup: 'warning', aiMessage },
-    5: { scrollDelay: 5000, overlayOpacity: 0.8, cooldown: 300, popup: 'cooldown', aiMessage },
-  };
+  await chrome.storage.local.set({ sf_current_friction_level: level });
 
-  return { level, config: configs[level] || configs[2] };
+  return { 
+    level, 
+    config: { 
+      ...FRICTION_LEVELS[level],
+      aiMessage 
+    } 
+  };
 }
 
 function calculateAiFriction(reels, time, lastReason, tolerance) {
@@ -250,14 +318,20 @@ function calculateAiFriction(reels, time, lastReason, tolerance) {
   return Math.min(Math.max(1, base), 5);
 }
 
-function calculateHeuristicFriction(url, tolerance, reels = 0) {
-  let level = tolerance;
+function calculateHeuristicFriction(url, profile, reels = 0) {
+  let baseScore = 20;
   for (const p of BRAINROT_PATTERNS) {
     if (p.pattern.test(url)) {
-      level = Math.min(tolerance + (p.score > 30 ? 1 : 0) + (reels > 10 ? 1 : 0), 5);
+      baseScore = p.score;
       break;
     }
   }
+  
+  // Add weight for reel count
+  if (reels > 15) baseScore += 20;
+  else if (reels > 5) baseScore += 10;
+
+  const { level } = calculateFrictionLevel(profile, baseScore);
   return level;
 }
 

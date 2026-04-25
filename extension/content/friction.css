@@ -15,7 +15,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 10, 26, var(--sf-opacity, 0.5));
+  background: rgba(0, 0, 0, var(--sf-opacity, 0.6));
   backdrop-filter: blur(8px);
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -88,7 +88,7 @@
   left: 0;
   right: 0;
   height: 6px;
-  background: rgba(10, 10, 26, 0.8);
+  background: rgba(0, 0, 0, 0.8);
   z-index: 2147483647;
   opacity: 0;
   transition: opacity 0.2s ease;

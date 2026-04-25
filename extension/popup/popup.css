@@ -151,6 +151,28 @@ h1 {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.stat-card-friction {
+  grid-column: span 2;
+  border-color: rgba(0, 206, 201, 0.2);
+}
+
+.friction-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.stat-sub {
+  font-size: 12px;
+  color: #00CEC9;
+  font-weight: 500;
+}
+
+.stat-card-friction[data-level="4"] #frictionLabel,
+.stat-card-friction[data-level="5"] #frictionLabel {
+  color: #FF6B6B;
+}
+
 .footer {
   display: flex;
   justify-content: space-between;

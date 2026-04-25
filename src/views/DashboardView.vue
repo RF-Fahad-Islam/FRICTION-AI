@@ -12,11 +12,22 @@ import BrainrotChart from '../components/BrainrotChart.vue'
 import ReasonsChart from '../components/ReasonsChart.vue'
 import AnalyticsMindMap from '../components/AnalyticsMindMap.vue'
 import SessionsList from '../components/SessionsList.vue'
+import HourlyReelsChart from '../components/HourlyReelsChart.vue'
+import FrictionProfile from '../components/FrictionProfile.vue'
+
+const showApiKeyModal = ref(false)
+const tempApiKey = ref('')
 
 const activityStore = useActivityStore()
 const profileStore = useProfileStore()
 
-const activeTab = ref('overview') // 'overview' | 'sessions' | 'insights' | 'history'
+const tabs = [
+  { id: 'overview', name: 'Intelligence', icon: '📊' },
+  { id: 'history', name: 'History', icon: '🕒' },
+  { id: 'sessions', name: 'Sessions', icon: '💻' },
+  { id: 'settings', name: 'Settings', icon: '⚙️' }
+]
+const activeTab = ref('overview') // 'overview' | 'sessions' | 'insights' | 'history' | 'settings'
 
 // Analytics Data
 const visits = ref([])
@@ -26,11 +37,25 @@ const isSyncing = ref(false)
 
 onMounted(() => {
   visits.value = storage.get(KEYS.VISITS, [])
+  tempApiKey.value = profileStore.profile?.preferences?.apiKey || ''
 })
+
+function saveApiKey() {
+  if (!tempApiKey.value) return
+  profileStore.setPreference('apiKey', tempApiKey.value)
+  showApiKeyModal.value = false
+  alert('API Key saved successfully! AI Friction is now active.')
+}
 
 async function syncHistory() {
   if (typeof chrome === 'undefined' || !chrome.history) {
     alert('Browser history API not available (are you running as an extension?).')
+    return
+  }
+
+  const apiKey = profileStore.profile?.preferences?.apiKey
+  if (!apiKey) {
+    showApiKeyModal.value = true
     return
   }
 
@@ -130,12 +155,25 @@ async function generateSummary(category) {
   isSummarizing.value[category] = true
   try {
     const apiKey = profileStore.profile?.preferences?.apiKey
+    if (!apiKey) {
+      showApiKeyModal.value = true
+      return
+    }
     const res = await summarizeLinks(categoryVisits.slice(0, 50), category, apiKey)
     summaries.value[category] = res.summary
   } catch (error) {
     summaries.value[category] = 'Failed to generate summary.'
   } finally {
     isSummarizing.value[category] = false
+  }
+}
+
+function saveApiKey() {
+  if (tempApiKey.value.trim()) {
+    profileStore.setPreference('apiKey', tempApiKey.value.trim())
+    showApiKeyModal.value = false
+    tempApiKey.value = ''
+    alert('API Key saved successfully!')
   }
 }
 </script>
@@ -151,13 +189,13 @@ async function generateSummary(category) {
       
       <div class="flex bg-surface-800 p-1 rounded-xl border border-white/5">
         <button 
-          v-for="tab in ['overview', 'sessions', 'insights', 'history']" 
-          :key="tab"
-          @click="activeTab = tab"
+          v-for="tab in tabs" 
+          :key="tab.id"
+          @click="activeTab = tab.id"
           class="px-4 py-1.5 rounded-lg text-sm font-medium transition-all capitalize"
-          :class="activeTab === tab ? 'bg-primary text-white shadow-lg' : 'text-text-muted hover:text-text-primary'"
+          :class="activeTab === tab.id ? 'bg-primary text-white shadow-lg' : 'text-text-muted hover:text-text-primary'"
         >
-          {{ tab }}
+          {{ tab.name }}
         </button>
       </div>
     </div>
@@ -165,26 +203,39 @@ async function generateSummary(category) {
     <!-- Overview Tab -->
     <div v-if="activeTab === 'overview'" class="space-y-6 animate-fade-in">
       <!-- Stats Grid -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div
-          v-for="stat in stats"
-          :key="stat.label"
-          class="glass-card p-5 relative overflow-hidden"
-        >
-          <div class="absolute inset-0 bg-gradient-to-br opacity-50" :class="stat.bg"></div>
-          <div class="relative">
-            <p class="text-xs text-text-muted uppercase tracking-wider mb-2">{{ stat.label }}</p>
-            <div class="flex items-baseline gap-1">
-              <span class="text-3xl font-bold" :class="stat.color">{{ stat.value }}</span>
-              <span class="text-sm text-text-muted">{{ stat.suffix }}</span>
-            </div>
+      <div class="grid lg:grid-cols-4 gap-6 mb-8">
+        <div class="lg:col-span-1">
+          <FrictionProfile />
+        </div>
+        <div class="lg:col-span-1">
+          <div class="glass-card p-6 h-full flex flex-col justify-center">
+            <h2 class="text-sm font-medium text-text-muted uppercase tracking-wider mb-2">Today's Focus</h2>
+            <div class="text-4xl font-bold text-text-primary">{{ activityStore.todayBrainrotScore }}%</div>
+            <div class="text-xs text-text-muted mt-2">Brainrot Ratio</div>
+          </div>
+        </div>
+        <div class="lg:col-span-1">
+          <div class="glass-card p-6 h-full flex flex-col justify-center">
+            <h2 class="text-sm font-medium text-text-muted uppercase tracking-wider mb-2">Total Reels</h2>
+            <div class="text-4xl font-bold text-primary-light">{{ activityStore.totalReels }}</div>
+            <div class="text-xs text-text-muted mt-2">Watched Today</div>
+          </div>
+        </div>
+        <div class="lg:col-span-1">
+          <div class="glass-card p-6 h-full flex flex-col justify-center">
+            <h2 class="text-sm font-medium text-text-muted uppercase tracking-wider mb-2">Active Sessions</h2>
+            <div class="text-4xl font-bold text-secondary">{{ activityStore.sessions.length }}</div>
+            <div class="text-xs text-text-muted mt-2">Today</div>
           </div>
         </div>
       </div>
 
-      <div class="grid lg:grid-cols-3 gap-6">
+      <div class="grid lg:grid-cols-4 gap-6">
         <div class="lg:col-span-2">
           <BrainrotChart />
+        </div>
+        <div class="lg:col-span-2">
+          <HourlyReelsChart />
         </div>
         <div class="lg:col-span-1">
           <ReasonsChart />
@@ -291,6 +342,51 @@ async function generateSummary(category) {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- API Key Modal -->
+    <div v-if="showApiKeyModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+      <div class="glass-card max-w-md w-full p-8 space-y-6 shadow-2xl border-primary/20">
+        <div class="text-center">
+          <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-primary-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-text-primary">Gemini API Key Required</h2>
+          <p class="text-sm text-text-muted mt-2">
+            To use AI classification and summaries, please provide your Gemini API key.
+            It is stored locally on your device.
+          </p>
+        </div>
+
+        <div class="space-y-4">
+          <input 
+            v-model="tempApiKey"
+            type="password" 
+            placeholder="Paste your API key here..."
+            class="w-full bg-surface-900 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+          />
+          <div class="flex gap-3">
+            <button 
+              @click="showApiKeyModal = false"
+              class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-white/5 hover:bg-white/10 text-text-secondary transition-all"
+            >
+              Cancel
+            </button>
+            <button 
+              @click="saveApiKey"
+              class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20 transition-all"
+            >
+              Save Key
+            </button>
+          </div>
+        </div>
+
+        <p class="text-[10px] text-center text-text-muted">
+          Don't have a key? Get one for free at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-primary-light hover:underline">Google AI Studio</a>.
+        </p>
       </div>
     </div>
   </div>

@@ -85,7 +85,6 @@ export function calculateFrictionLevel(profile, brainrotScore, now = new Date())
   const hour = now.getHours();
   const tolerance = profile?.behavior?.frictionTolerance || 2;
   const peakTime = profile?.behavior?.peakDistractionTime || '';
-  const highRiskSites = profile?.behavior?.highRiskSites || [];
   let level = 1;
   const reasons = [];
 

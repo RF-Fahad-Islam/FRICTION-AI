@@ -5,15 +5,16 @@ export const useActivityStore = defineStore('activity', () => {
   const reelTime = ref(0)
   const dailyActivity = ref({})
   const todayBrainrotScore = ref(0)
-  
   const reelCount = ref(0)
+  const hourlyReels = ref({})
   
   function fetchStats() {
     if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.get(['sf_reel_time', 'sf_daily_activity', 'sf_reel_count', 'sf_history_scores'], (data) => {
+      chrome.storage.local.get(['sf_reel_time', 'sf_daily_activity', 'sf_reel_count', 'sf_hourly_reels', 'sf_history_scores'], (data) => {
         reelTime.value = data.sf_reel_time || 0
         reelCount.value = data.sf_reel_count || 0
         dailyActivity.value = data.sf_daily_activity || {}
+        hourlyReels.value = data.sf_hourly_reels || {}
         
         let brainrotTime = 0
         let totalTime = 0
@@ -56,6 +57,6 @@ export const useActivityStore = defineStore('activity', () => {
   })
 
   return {
-    reelTime, reelCount, dailyActivity, todayBrainrotScore, fetchStats
+    reelTime, reelCount, dailyActivity, todayBrainrotScore, hourlyReels, fetchStats
   }
 })

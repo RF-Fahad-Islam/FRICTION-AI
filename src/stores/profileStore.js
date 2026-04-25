@@ -19,6 +19,9 @@ export const useProfileStore = defineStore('profile', () => {
   function setPreference(key, value) {
     profile.value = updateProfile({ preferences: { [key]: value } })
   }
+  function updateTone(newTone) {
+    profile.value = updateProfile({ preferences: { tone: newTone } })
+  }
 
-  return { profile, frictionTolerance, brainrotRate, tone, summary, refresh, update, reset, setPreference }
+  return { profile, frictionTolerance, brainrotRate, tone, summary, refresh, update, reset, setPreference, updateTone }
 })
