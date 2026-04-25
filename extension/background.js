@@ -11,7 +11,7 @@ const BRAINROT_PATTERNS = [
   { pattern: /twitter\.com/, score: 25 },
   { pattern: /x\.com/, score: 25 },
   { pattern: /reddit\.com/, score: 20 },
-  { pattern: /facebook.com/(reel|reels|watch)/, score: 40 },
+  { pattern: /facebook\.com\/(reel|reels|watch)/, score: 40 },
 ];
 
 // Listen for messages from content scripts
@@ -280,6 +280,29 @@ function logScrollReason(payload) {
   if (currentSession) {
     currentSession.reasons = currentSession.reasons || [];
     currentSession.reasons.push(payload.reason);
+  }
+}
+
+async function callGemini(apiKey, prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prompt)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API Error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  } catch (e) {
+    console.error('Gemini API Call Failed:', e);
+    throw e;
   }
 }
 
