@@ -11,6 +11,12 @@
 (function () {
   'use strict';
 
+  // Add site-specific class for scoped CSS rules
+  const hostname = window.location.hostname;
+  if (hostname.includes('instagram.com')) document.documentElement.classList.add('sf-site-instagram');
+  if (hostname.includes('facebook.com')) document.documentElement.classList.add('sf-site-facebook');
+  if (hostname.includes('youtube.com')) document.documentElement.classList.add('sf-site-youtube');
+
   let config = null;
 
   function isContextValid() {
