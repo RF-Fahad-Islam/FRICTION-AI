@@ -22,6 +22,7 @@ export const KEYS = {
   HOURLY_METRICS: `${STORAGE_PREFIX}hourly_metrics`,
   HISTORY_SCORES: `${STORAGE_PREFIX}history_scores`,
   DAILY_ACTIVITY: `${STORAGE_PREFIX}daily_activity`,
+  BLOCK_LOGS: `${STORAGE_PREFIX}block_logs`,
 };
 
 /** Max items per collection to prevent localStorage bloat */
@@ -65,6 +66,11 @@ export function set(key, value) {
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ [key]: value });
     }
+
+    // Dispatch local event for reactivity
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sf_storage_updated', { detail: { key, newValue: value } }));
+    }
   } catch (e) {
     console.warn('[Storage] Write failed:', e.message);
     if (e.name === 'QuotaExceededError') {
@@ -94,6 +100,11 @@ export function append(key, item) {
     // Sync to chrome.storage if available
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
       chrome.storage.local.set({ [key]: arr });
+    }
+
+    // Dispatch local event for reactivity
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sf_storage_updated', { detail: { key, newValue: arr } }));
     }
 
   } catch (e) {

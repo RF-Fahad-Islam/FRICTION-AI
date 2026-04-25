@@ -128,6 +128,10 @@ async function generateSummary(category) {
     isSummarizing.value[category] = false
   }
 }
+
+function handleReclassify({ domain, category }) {
+  console.log(`Reclassified ${domain} to ${category}`)
+}
 </script>
 
 <template>
@@ -200,7 +204,7 @@ async function generateSummary(category) {
           <ReasonsChart />
         </div>
         <div class="lg:col-span-2">
-          <AnalyticsMindMap :visits="visits" />
+          <AnalyticsMindMap :visits="visits" @reclassify="handleReclassify" />
         </div>
       </div>
 

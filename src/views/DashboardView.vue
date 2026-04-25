@@ -184,6 +184,15 @@ const activeCategories = computed(() => {
 
 const expandedCategory = ref(null)
 
+// Get recent visits for overview display
+const recentVisits = computed(() => {
+  if (!visits.value || !Array.isArray(visits.value)) return []
+  return visits.value
+    .filter(v => v && v.timestamp)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 10)
+})
+
 const focusScore = computed(() => Math.max(0, 100 - (activityStore.todayBrainrotScore || 0)))
 
 const stats = computed(() => [
@@ -235,6 +244,10 @@ async function generateSummary(category) {
   } finally {
     isSummarizing.value[category] = false
   }
+}
+
+function handleReclassify({ domain, category }) {
+  console.log(`Reclassified ${domain} to ${category}`)
 }
 </script>
 
@@ -337,6 +350,60 @@ async function generateSummary(category) {
           <FrictionProfile />
         </div>
       </div>
+
+      <!-- Recent Browsing History Preview -->
+      <div class="glass-card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-text-primary">Recent Browsing</h2>
+          <div class="flex gap-2">
+            <button 
+              @click="syncHistory"
+              :disabled="isSyncing"
+              class="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-text-secondary transition-all flex items-center gap-1.5"
+            >
+              <svg v-if="isSyncing" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {{ isSyncing ? 'Syncing...' : 'Sync' }}
+            </button>
+            <button 
+              @click="activeTab = 'history'"
+              class="text-xs px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary-light rounded-lg transition-all"
+            >
+              View All
+            </button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <div 
+            v-for="(visit, idx) in recentVisits" 
+            :key="idx"
+            class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all group"
+          >
+            <div 
+              class="w-2 h-2 rounded-full shrink-0"
+              :style="{ backgroundColor: getCategoryColor(visit.category) }"
+            ></div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-text-primary truncate group-hover:text-primary-light transition-colors">
+                {{ visit.title || visit.url }}
+              </p>
+              <p class="text-[10px] text-text-muted">
+                {{ new Date(visit.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }} · {{ getCategoryLabel(visit.category) }}
+              </p>
+            </div>
+            <div 
+              v-if="visit.confidence >= 0.8"
+              class="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary-light shrink-0"
+            >
+              AI
+            </div>
+          </div>
+          <div v-if="recentVisits.length === 0" class="text-center py-8 text-text-muted text-sm">
+            No browsing history yet. Click "Sync" to import your browser history.
+          </div>
+        </div>
+      </div>
     </div>
     <!-- Sessions Tab -->
     <div v-if="activeTab === 'sessions'" class="space-y-6 animate-fade-in">
@@ -363,7 +430,7 @@ async function generateSummary(category) {
           </button>
         </div>
         <div class="h-[500px]">
-          <AnalyticsMindMap :visits="visits" />
+          <AnalyticsMindMap :visits="visits" @reclassify="handleReclassify" />
         </div>
       </div>
     </div>

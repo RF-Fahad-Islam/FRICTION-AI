@@ -80,23 +80,23 @@ export function saveProfile(profile) {
 export function updateProfile(updates) {
   const current = getProfile();
 
-  // Deep merge behavior and preferences
+  // Deep merge behavior and preferences with safety
   const merged = {
     ...current,
     ...updates,
     behavior: {
-      ...current.behavior,
+      ...(current.behavior || {}),
       ...(updates.behavior || {}),
     },
     preferences: {
-      ...current.preferences,
+      ...(current.preferences || {}),
       ...(updates.preferences || {}),
     },
     history: {
-      ...current.history,
+      ...(current.history || {}),
       ...(updates.history || {}),
       frictionResponses: {
-        ...current.history.frictionResponses,
+        ...(current.history?.frictionResponses || {}),
         ...(updates.history?.frictionResponses || {}),
       },
     },
@@ -135,12 +135,13 @@ export function resetProfile() {
  */
 export function getProfileSummary() {
   const p = getProfile();
-  const b = p.behavior;
-  const pref = p.preferences;
-  const h = p.history;
+  const b = p.behavior || {};
+  const pref = p.preferences || {};
+  const h = p.history || { lastWeekScores: [], frictionResponses: {} };
+  const scores = h.lastWeekScores || [];
 
-  const avgScore = h.lastWeekScores.length > 0
-    ? Math.round(h.lastWeekScores.reduce((a, b) => a + b, 0) / h.lastWeekScores.length)
+  const avgScore = scores.length > 0
+    ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     : 'N/A';
 
   return [

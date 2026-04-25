@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { sendMessage, getChatHistory, clearChatHistory } from '../../services/aiChat.js'
 import { useProfileStore } from './profileStore.js'
+import { KEYS } from '../../storage/storageAdapter.js'
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref(getChatHistory())
@@ -40,6 +41,15 @@ export const useChatStore = defineStore('chat', () => {
 
   function setApiKey(key) {
     profileStore.setPreference('apiKey', key)
+  }
+
+  // Reactive storage listener
+  if (typeof window !== 'undefined') {
+    window.addEventListener('sf_storage_updated', (e) => {
+      if (e.detail.key === KEYS.CHAT_HISTORY) {
+        messages.value = e.detail.newValue || []
+      }
+    })
   }
 
   return { messages, isLoading, lastError, apiKey, hasMessages, send, clear, setApiKey }

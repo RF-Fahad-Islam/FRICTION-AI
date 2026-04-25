@@ -47,9 +47,17 @@ function scrollToBottom() {
 }
 
 function saveApiKey() {
-  if (tempApiKey.value.trim()) {
-    profileStore.setPreference('apiKey', tempApiKey.value.trim())
-    showApiKeyPrompt.value = false
+  const key = tempApiKey.value.trim()
+  if (key) {
+    console.log('[ChatView] Saving API key...')
+    profileStore.setPreference('apiKey', key)
+    
+    // Force a small delay to ensure storage writes complete
+    setTimeout(() => {
+      showApiKeyPrompt.value = false
+      // Also notify chatStore if it hasn't caught the event
+      chatStore.setApiKey(key)
+    }, 100)
   }
 }
 

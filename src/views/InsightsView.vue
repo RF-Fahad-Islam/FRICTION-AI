@@ -24,12 +24,12 @@ const avgWeekScore = computed(() => {
 })
 
 const frictionStats = computed(() => {
-  const r = h.value.frictionResponses || { ignored: 0, obeyed: 0, exitedEarly: 0 }
-  const total = r.ignored + r.obeyed + r.exitedEarly
+  const r = h.value?.frictionResponses || { ignored: 0, obeyed: 0, exitedEarly: 0 }
+  const total = (r.ignored || 0) + (r.obeyed || 0) + (r.exitedEarly || 0)
   return {
     ...r,
     total,
-    obeyRate: total > 0 ? Math.round((r.obeyed / total) * 100) : 0,
+    obeyRate: total > 0 ? Math.round(((r.obeyed || 0) / total) * 100) : 0,
   }
 })
 
