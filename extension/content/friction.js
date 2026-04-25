@@ -26,16 +26,32 @@
   let currentDomain = null;
   let currentUrl = window.location.href;
   let reelCount = 0;        // consecutive reels watched
+  let lastActiveTimestamp = Date.now();
+
+  function getCurrentDynamicLevel() {
+    const sessionMinutes = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 60000) : 0;
+    
+    let dynamicLevel = config ? parseInt(config.level, 10) : 1;
+    dynamicLevel += Math.floor(sessionMinutes / 5); // slow: +1 every 5 mins
+    dynamicLevel += Math.floor(reelCount / 15);     // slow: +1 every 15 reels
+    
+    return Math.min(Math.max(dynamicLevel, 1), 5);
+  }
 
 
   // SPA Navigation Detection for Reel Counting (Accurate tracking)
   const checkUrlChange = () => {
     if (window.location.href !== currentUrl) {
       currentUrl = window.location.href;
-      const isReelPath = (url) => url.includes('/shorts/') || url.includes('/reels/') || url.includes('/reel/');
+      lastActiveTimestamp = Date.now();
+
+      const isReelPath = (url) => url.includes('/shorts/') || url.includes('/reels/') || url.includes('/reel/') || url.includes('/watch');
 
       if (isReelPath(currentUrl)) {
         reelCount++;
+        if (config && isContextValid()) {
+          chrome.storage.local.set({ sf_current_friction_level: getCurrentDynamicLevel(), sf_last_active: Date.now() });
+        }
         if (config && config.level >= 2) {
           document.body.classList.add('sf-hide-interactions');
         }
@@ -95,7 +111,7 @@
     config = newConfig;
 
     // Toggle interaction visibility (Dopamine Desaturation)
-    const isReelPath = (url) => url.includes('/shorts/') || url.includes('/reels/') || url.includes('/reel/');
+    const isReelPath = (url) => url.includes('/shorts/') || url.includes('/reels/') || url.includes('/reel/') || url.includes('/watch');
     if (isReelPath(window.location.href) && config.level >= 2) {
       document.body.classList.add('sf-hide-interactions');
     } else {
@@ -103,9 +119,11 @@
     }
 
     // Heavy Scrolling with dynamic friction based on session time
-    if (config.level >= 2) {
-      const sessionTimeSeconds = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
-      applyScrollFriction(baseLevel, sessionTimeSeconds, reelCount);
+    const sessionTimeSeconds = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
+    applyScrollFriction(baseLevel, sessionTimeSeconds, reelCount);
+
+    if (isContextValid()) {
+      chrome.storage.local.set({ sf_current_friction_level: getCurrentDynamicLevel() });
     }
   });
 
@@ -129,70 +147,77 @@
   function applyScrollFriction(baseLevel, sessionTimeSeconds = 0, scrollCount = 0) {
     if (blockScrollHandler) return;
     let scrollAccumulator = 0;
-
-    // Dynamic: escalation based on session time
-    const sessionMinutes = sessionTimeSeconds / 60;
-    let dynamicLevel = baseLevel;
-    
-    // Time escalation: +1 every 5 min
-    if (sessionMinutes > 5) {
-      dynamicLevel = Math.min(dynamicLevel + Math.floor(sessionMinutes / 5), 5);
-    }
-    // Reel count escalation: +1 every 10 reels
-    if (scrollCount > 10) {
-      dynamicLevel = Math.min(dynamicLevel + Math.floor(scrollCount / 10), 5);
-    }
-    // Peak hours (22:00-02:00) stricter
-    const hour = new Date().getHours();
-    if (hour >= 22 || hour <= 2) {
-      dynamicLevel = Math.min(dynamicLevel + 1, 5);
-    }
-
-    const level = dynamicLevel;
+    let isScrollUnlocked = false;
+    let lastTouchY = 0;
 
     blockScrollHandler = (e) => {
+      if (isScrollUnlocked) return;
 
+      // 30-Minute Inactivity Reset
+      if (Date.now() - lastActiveTimestamp >= 30 * 60 * 1000) {
+        sessionStartTime = Date.now();
+        reelCount = 0;
+      }
+      lastActiveTimestamp = Date.now();
+      if (config && isContextValid()) {
+        chrome.storage.local.set({ sf_current_friction_level: getCurrentDynamicLevel(), sf_last_active: Date.now() });
+      }
 
-      const baseDelta = 150 + level * 130;
-      const growthFactor = 1 + (Math.floor(reelCount / 3) * 0.2);
-      const requiredDelta = Math.min(baseDelta * growthFactor, 2500);
+      const level = getCurrentDynamicLevel();
+
+      // Widen the gap massively between levels so L2 is genuinely harder than L1
+      const baseDeltas = { 
+        1: 250,   // Very easy (1-2 scroll notches)
+        2: 800,   // Moderate / noticeable effort (distinctly harder)
+        3: 1800,  // Hard (genuinely annoying)
+        4: 3500,  // Very hard (requires significant dedicated swipes)
+        5: 6000   // Maximum (violently hard to pass)
+      };
+      const baseDelta = baseDeltas[level] || 250;
+      
+      // Flatten the inter-level growth so difficulty jumps are dictated by the levels
+      const requiredDelta = baseDelta;
+
+      let delta = 0;
 
       if (e.type === 'wheel') {
-        const delta = Math.abs(e.deltaY);
+        delta = Math.abs(e.deltaY);
         if (e.deltaY === 0) return;
+      } else if (e.type === 'touchstart') {
+        lastTouchY = e.touches[0].clientY;
+        // Do not prevent default on touchstart to preserve tap/click functionality
+        return;
+      } else if (e.type === 'touchmove') {
+        const currentY = e.touches[0].clientY;
+        delta = Math.abs(currentY - lastTouchY);
+        lastTouchY = currentY;
+        if (delta === 0) return;
+      } else {
+        return;
+      }
 
-        // Sticky Friction: Apply a "Gravity Pull" in opposite direction
-        const resistanceScale = 0.05 * level;
-        window.scrollBy(0, -e.deltaY * resistanceScale);
+      scrollAccumulator += delta;
+      const progress = Math.min(scrollAccumulator, requiredDelta);
+      updateFillBar(progress, requiredDelta);
 
-        scrollAccumulator += delta;
-        const progress = Math.min(scrollAccumulator, requiredDelta);
-        updateFillBar(progress, requiredDelta);
+      // Conscious Preview: Scrape next reel title and show it
+      if (progress > (requiredDelta * 0.3)) {
+        const nextTitle = getNextReelTitle();
+        if (nextTitle) showNextPreview(nextTitle);
+      }
 
-        // Conscious Preview: Scrape next reel title and show it
-        if (progress > (requiredDelta * 0.3)) {
-          const nextTitle = getNextReelTitle();
-          if (nextTitle) showNextPreview(nextTitle);
-        }
-
-        if (scrollAccumulator >= requiredDelta) {
-          scrollAccumulator = 0;
-          hideFillBar();
-          hideNextPreview();
-          return;
-        } else {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      } else if (e.type === 'touchstart' || e.type === 'touchmove') {
+      if (scrollAccumulator >= requiredDelta) {
+        scrollAccumulator = 0;
+        hideFillBar();
+        hideNextPreview();
+        isScrollUnlocked = true;
+        // Reduce unlock window to 400ms to prevent multi-swiping frictionless reels
+        setTimeout(() => { isScrollUnlocked = false; }, 400); 
+        return; // Allow the scroll event to pass through natively
+      } else {
+        // Aggressively prevent default on the actual target to block scroll snapping containers
         e.preventDefault();
         e.stopPropagation();
-        if (e.type === 'touchmove') {
-          createFillBar();
-          fillBarEl.classList.add('sf-visible');
-          // Add touch jitter
-          if (Math.random() > 0.8) window.scrollBy(0, (Math.random() - 0.5) * 10);
-        }
       }
     };
 
@@ -203,6 +228,12 @@
   }
 
   function keydownBlocker(e) {
+    // 30-Minute Inactivity Reset
+    if (Date.now() - lastActiveTimestamp >= 30 * 60 * 1000) {
+      sessionStartTime = Date.now();
+      reelCount = 0;
+    }
+    lastActiveTimestamp = Date.now();
 
     const blockedKeys = ['ArrowUp', 'ArrowDown', 'Space', 'PageUp', 'PageDown'];
     if (blockedKeys.includes(e.code)) {
@@ -235,6 +266,13 @@
 
     grayscaleInterval = setInterval(() => {
       if (!sessionStartTime) return;
+      
+      const currentLevel = getCurrentDynamicLevel();
+      if (currentLevel < 5) {
+        applyGrayscaleToPage(0);
+        return;
+      }
+
       const elapsed = Date.now() - sessionStartTime;
       const pct = Math.min(elapsed / totalMs, 1);
       // Use a power curve so the effect is subtle at first, then strong
@@ -246,7 +284,11 @@
 
   function applyGrayscaleToPage(grayscalePct) {
     // Apply to html element so it covers the whole page
-    document.documentElement.style.filter = `grayscale(${grayscalePct}%)`;
+    if (grayscalePct === 0) {
+      document.documentElement.style.filter = '';
+    } else {
+      document.documentElement.style.filter = `grayscale(${grayscalePct}%)`;
+    }
     document.documentElement.style.transition = 'filter 2s ease';
   }
 
@@ -265,8 +307,11 @@
   // ═══════════════════════════════════════════════════════════════════════════
 
   function checkIntentIntercept() {
+    const currentLevel = getCurrentDynamicLevel();
+    if (currentLevel < 2) return;
+
     // Apply grayscale layer after 10 reels
-    if (reelCount >= 10) {
+    if (reelCount >= 10 && currentLevel === 5) {
       showGrayscaleLock();
     }
 
@@ -324,9 +369,9 @@
 
         // Unlock — add a cooldown before intercept fires again
 
-        reelCount = 0;
         intentPopupCooldown = Date.now() + (reason === 'break' || reason === 'learning' ? 300000 : 120000);
         removeOverlay();
+        removeGrayscaleLock();
       });
     });
   }

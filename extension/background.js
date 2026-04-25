@@ -362,56 +362,22 @@ async function handleBrainrotDetected(payload, tab) {
   if (events.length > 200) events.splice(0, events.length - 200);
   await chrome.storage.local.set({ sf_friction_log: events });
 
-  // Update current friction level in storage based on detected score
-  const profile = (await chrome.storage.local.get('sf_profile')).sf_profile;
-  const { level } = calculateFrictionLevel(profile, payload.score);
-  await chrome.storage.local.set({ sf_current_friction_level: level });
+  // Background no longer pushes the level to storage during active sessions.
+  // The content script (friction.js) is the sole source of truth for dynamic session level.
 }
 
 async function getFrictionConfig(url) {
-  const profileData = await chrome.storage.local.get(['sf_profile', 'sf_reel_count', 'sf_reel_time', 'sf_scroll_reasons']);
-  const profile = profileData.sf_profile;
-  const reelCount = profileData.sf_reel_count || 0;
-  const reelTime = profileData.sf_reel_time || 0;
-  const reasons = profileData.sf_scroll_reasons || [];
-  const lastReason = reasons.length > 0 ? reasons[reasons.length - 1].reason : 'unknown';
+  const data = await chrome.storage.local.get(['sf_profile', 'sf_current_friction_level', 'sf_last_active']);
+  const profile = data.sf_profile;
 
-  const metrics = {
-    reels: reelCount,
-    timeSpent: reelTime,
-    lastReason
-  };
-
-  const baseBrainrotScore = calculateBrainrotScore(metrics);
-  let level = 2;
-  let aiMessage = "Adaptive friction active.";
-
-  const apiKey = profile?.preferences?.apiKey;
-  if (apiKey) {
-    try {
-      const prompt = frictionDecisionPrompt(metrics, profile);
-      const response = await callGemini(apiKey, prompt);
-      const aiDecision = JSON.parse(response);
-      
-      level = aiDecision.level;
-      aiMessage = aiDecision.aiMessage || `AI set level ${level}: ${aiDecision.reasoning}`;
-    } catch (e) {
-      console.warn('AI Friction Decision Failed, falling back to heuristics:', e);
-      const result = calculateFrictionLevel(profile, baseBrainrotScore);
-      level = result.level;
-    }
-  } else {
-    const result = calculateFrictionLevel(profile, baseBrainrotScore);
-    level = result.level;
-  }
-
-  await chrome.storage.local.set({ sf_current_friction_level: level });
+  const isSessionActive = data.sf_last_active && (Date.now() - data.sf_last_active < 30 * 60 * 1000);
+  const level = isSessionActive ? (data.sf_current_friction_level || 1) : parseInt(profile?.behavior?.frictionTolerance || 1, 10);
 
   return { 
     level, 
     config: { 
       ...FRICTION_LEVELS[level],
-      aiMessage 
+      aiMessage: "Adaptive friction active."
     } 
   };
 }

@@ -54,8 +54,8 @@ export function generateFrictionProfile(sessions, dailyActivity, profile) {
     reasons.push('Frequent short distractions during day');
   }
 
-  // Update profile behavior settings
-  const frictionTolerance = type === PROFILE_TYPES.REEL_ADDICT ? 4 : (type === PROFILE_TYPES.NIGHT_OWL ? 3 : 2);
+  // Update profile behavior settings (preserve user's explicit tolerance)
+  const frictionTolerance = profile?.behavior?.frictionTolerance || 1;
   const peakDistractionTime = type === PROFILE_TYPES.NIGHT_OWL ? '22:00-02:00' : '';
 
   return {

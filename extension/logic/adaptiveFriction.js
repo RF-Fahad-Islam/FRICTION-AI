@@ -83,31 +83,12 @@ export function isInTimeRange(hour, range) {
  */
 export function calculateFrictionLevel(profile, brainrotScore, now = new Date()) {
   const hour = now.getHours();
-  const tolerance = profile?.behavior?.frictionTolerance || 2;
+  const tolerance = parseInt(profile?.behavior?.frictionTolerance || 2, 10);
   const peakTime = profile?.behavior?.peakDistractionTime || '';
-  let level = 1;
+  let level = tolerance;
   const reasons = [];
 
-  // Base level from brainrot score
-  if (brainrotScore >= 80) {
-    level = 4;
-    reasons.push('Very high brainrot score');
-  } else if (brainrotScore >= 60) {
-    level = 3;
-    reasons.push('High brainrot score');
-  } else if (brainrotScore >= 40) {
-    level = 2;
-    reasons.push('Moderate brainrot score');
-  } else {
-    level = 1;
-    reasons.push('Low brainrot score');
-  }
-
-  // Adjust for user's friction tolerance preference
-  const toleranceOffset = tolerance - 2; // 2 is neutral
-  level += toleranceOffset;
-  if (toleranceOffset > 0) reasons.push('User prefers stricter friction');
-  if (toleranceOffset < 0) reasons.push('User prefers gentler friction');
+  reasons.push(`Base tolerance: ${tolerance}`);
 
   // Peak distraction hours → bump up
   if (isInTimeRange(hour, peakTime)) {

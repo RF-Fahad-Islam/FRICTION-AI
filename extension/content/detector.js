@@ -26,7 +26,7 @@
       
       // Explicitly check if it's a Reel/Short to avoid counting normal page navigation
       const path = location.pathname;
-      const isReel = path.includes('/reels/') || path.includes('/shorts/') || location.hostname.includes('tiktok.com');
+      const isReel = path.includes('/reels/') || path.includes('/reel/') || path.includes('/watch') || path.includes('/shorts/') || location.hostname.includes('tiktok.com');
       if (!isReel) return;
 
       const now = Date.now();
@@ -189,4 +189,22 @@
     isActive = false;
     if (checkInterval) clearInterval(checkInterval);
   });
+
+  // Proactive initialization for first-load race conditions
+  setTimeout(() => {
+    if (!isActive) {
+      try {
+        chrome.runtime.sendMessage(
+          { type: 'GET_FRICTION_CONFIG', payload: { url: location.href } },
+          (response) => {
+            if (response && !isActive) {
+              activate({ baseScore: 40, url: location.href });
+            }
+          }
+        );
+      } catch (e) {
+        console.log('Context invalidated on self-activation');
+      }
+    }
+  }, 500);
 })();
