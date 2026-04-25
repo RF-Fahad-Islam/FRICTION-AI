@@ -3,17 +3,12 @@ import { Play, Download, Apple } from 'lucide-vue-next'
 import Button from './ui/button/Button.vue'
 
 function downloadExtension() {
-  const files = ['extension.crx', 'extension.pem', 'extension.zip'];
-  files.forEach((file, index) => {
-    setTimeout(() => {
-      const link = document.createElement('a');
-      link.href = `/${file}`;
-      link.download = file;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, index * 200);
-  });
+  const link = document.createElement('a');
+  link.href = '/extension.zip';
+  link.download = 'extension.zip';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 </script>
 
