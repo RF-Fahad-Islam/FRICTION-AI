@@ -58,8 +58,9 @@
         if (config && isContextValid()) {
           chrome.storage.local.set({ sf_current_friction_level: getCurrentDynamicLevel(), sf_last_active: Date.now() });
         }
-        if (config && config.level >= 2) {
+        if (config && config.level >= 1) {
           document.body.classList.add('sf-hide-interactions');
+          document.body.setAttribute('data-sf-domain', window.location.hostname);
         }
         if (isContextValid()) {
           chrome.runtime.sendMessage({ type: 'UPDATE_REEL_COUNT', payload: { count: reelCount } }).catch(() => { });
@@ -119,8 +120,9 @@
 
     // Toggle interaction visibility (Dopamine Desaturation)
     const isReelPath = (url) => url.includes('/shorts/') || url.includes('/reels/') || url.includes('/reel/') || url.includes('/watch');
-    if (isReelPath(window.location.href) && config.level >= 2) {
+    if (isReelPath(window.location.href) && config.level >= 1) {
       document.body.classList.add('sf-hide-interactions');
+      document.body.setAttribute('data-sf-domain', window.location.hostname);
     } else {
       document.body.classList.remove('sf-hide-interactions');
     }

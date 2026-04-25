@@ -160,14 +160,6 @@
 
 /* Hide native navigation and interaction buttons to force scroll friction and reduce dopamine */
 
-/* Sidebars / Navigation */
-a[href="/reels/"], 
-a[href="/reels/videos/"],
-ytd-guide-entry-renderer:has(a[href="/shorts/"]),
-ytd-mini-guide-entry-renderer:has(a[href="/shorts/"]),
-a[href*="/shorts/"] {
-  display: none !important;
-}
 
 /* Instagram Reels Interaction Buttons */
 .sf-site-instagram .sf-hide-interactions [aria-label="Like"],
@@ -179,22 +171,73 @@ a[href*="/shorts/"] {
   display: none !important;
 }
 
+/* Permanent Nuke for Instagram Reels Navigation Arrows */
+html.sf-site-instagram body.sf-hide-interactions button[aria-label*="next" i],
+html.sf-site-instagram body.sf-hide-interactions button[aria-label*="prev" i],
+html.sf-site-instagram body.sf-hide-interactions button[aria-label*="down" i],
+html.sf-site-instagram body.sf-hide-interactions button[aria-label*="up" i],
+html.sf-site-instagram body.sf-hide-interactions button:has(svg[aria-label*="next" i]),
+html.sf-site-instagram body.sf-hide-interactions button:has(svg[aria-label*="prev" i]),
+html.sf-site-instagram body.sf-hide-interactions button:has(svg[aria-label*="down" i]),
+html.sf-site-instagram body.sf-hide-interactions button:has(svg[aria-label*="up" i]),
+html.sf-site-instagram body.sf-hide-interactions div[role="button"][aria-label*="next" i],
+html.sf-site-instagram body.sf-hide-interactions div[role="button"][aria-label*="prev" i],
+html.sf-site-instagram body.sf-hide-interactions div[role="button"]:has(svg[aria-label*="next" i]),
+html.sf-site-instagram body.sf-hide-interactions div[role="button"]:has(svg[aria-label*="prev" i]),
+html.sf-site-instagram body.sf-hide-interactions div[role="button"]:has(svg[aria-label*="down" i]),
+html.sf-site-instagram body.sf-hide-interactions div[role="button"]:has(svg[aria-label*="up" i]) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(0) !important;
+  position: absolute !important;
+  z-index: -9999 !important;
+}
+
+
 /* Facebook Reels Interaction Buttons (Hide Up/Down navigation, preserve Like/Comment) */
 .sf-site-facebook .sf-hide-interactions [aria-label="Next video"],
 .sf-site-facebook .sf-hide-interactions [aria-label="Previous video"],
 .sf-site-facebook .sf-hide-interactions [aria-label="Next Card"],
 .sf-site-facebook .sf-hide-interactions [aria-label="Previous Card"],
 .sf-site-facebook .sf-hide-interactions div[role="button"][aria-label="Next"],
-.sf-site-facebook .sf-hide-interactions div[role="button"][aria-label="Previous"] {
+.sf-site-facebook .sf-hide-interactions div[role="button"][aria-label="Previous"],
+body[data-sf-domain*="facebook.com"].sf-hide-interactions div[role="button"][aria-label*="Next"],
+body[data-sf-domain*="facebook.com"].sf-hide-interactions div[role="button"][aria-label*="Previous"] {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* YouTube Shorts Interaction Buttons (Hide Up/Down navigation, preserve Like/Comment) */
-.sf-site-youtube .sf-hide-interactions #navigation-button-up,
-.sf-site-youtube .sf-hide-interactions #navigation-button-down,
-.sf-site-youtube .sf-hide-interactions [aria-label="Next video"],
-.sf-site-youtube .sf-hide-interactions [aria-label="Previous video"] {
+html.sf-site-youtube body.sf-hide-interactions #navigation-button-up,
+html.sf-site-youtube body.sf-hide-interactions #navigation-button-down,
+html.sf-site-youtube body.sf-hide-interactions #navigation-buttons,
+html.sf-site-youtube body.sf-hide-interactions ytd-reel-video-renderer #navigation-button-up,
+html.sf-site-youtube body.sf-hide-interactions ytd-reel-video-renderer #navigation-button-down,
+html.sf-site-youtube body.sf-hide-interactions [aria-label="Next video"],
+html.sf-site-youtube body.sf-hide-interactions [aria-label="Previous video"],
+body[data-sf-domain*="youtube.com"].sf-hide-interactions #navigation-button-up,
+body[data-sf-domain*="youtube.com"].sf-hide-interactions #navigation-button-down,
+body[data-sf-domain*="youtube.com"].sf-hide-interactions ytd-button-renderer#navigation-button-up,
+body[data-sf-domain*="youtube.com"].sf-hide-interactions ytd-button-renderer#navigation-button-down,
+body[data-sf-domain*="youtube.com"].sf-hide-interactions ytd-button-renderer#navigation-button-up button,
+body[data-sf-domain*="youtube.com"].sf-hide-interactions ytd-button-renderer#navigation-button-down button,
+body.sf-hide-interactions ytd-reel-video-renderer #navigation-button-down,
+body.sf-hide-interactions ytd-reel-video-renderer #navigation-button-up,
+body[data-sf-domain*="youtube.com"].sf-hide-interactions [id^="navigation-button-up"],
+body[data-sf-domain*="youtube.com"].sf-hide-interactions [id^="navigation-button-down"],
+body[data-sf-domain*="youtube.com"].sf-hide-interactions ytd-reel-video-renderer button[aria-label*="Next"],
+body[data-sf-domain*="youtube.com"].sf-hide-interactions ytd-reel-video-renderer button[aria-label*="Previous"] {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(0) !important;
+  position: absolute !important;
+  z-index: -9999 !important;
 }
 
 /* 5. Grayscale Lock Layer */
