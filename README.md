@@ -6,12 +6,6 @@ Study Friction AI is a local-first browser extension and AI-powered dashboard de
 
 ## ✨ Core Features
 
-### 🧠 AI Focus Coach
-The central interface for behavioral change. It's a data-aware mentor that knows your habits better than you do.
-- **Context-Aware Advice**: Analyzes your browsing patterns, time spent, and "brainrot" scores to provide firm but empathetic guidance.
-- **Data Integration**: The coach sees your real-time stats and block bypass reasons to tailor its coaching.
-- **Powered by Gemini**: Uses Gemini 1.5 Flash for high-impact, concise coaching (requires API key).
-
 ### ⚡ Study Friction Engine
 A collection of psychological interventions that make distracting content "harder" to consume.
 - **Dynamic Scroll Resistance**: Intercepts scrolling on addictive sites, requiring physical effort (measured delta) to move to the next piece of content.

@@ -9,9 +9,9 @@ import { KEYS } from '../../storage/storageAdapter.js'
 export const useProfileStore = defineStore('profile', () => {
   const profile = ref(getProfile())
 
-  const frictionTolerance = computed(() => profile.value.behavior?.frictionTolerance || 2)
-  const brainrotRate = computed(() => Math.round((profile.value.behavior?.brainrotRate || 0) * 100))
-  const tone = computed(() => profile.value.preferences?.tone || 'balanced')
+  const frictionTolerance = computed(() => profile.value?.behavior?.frictionTolerance || 2)
+  const brainrotRate = computed(() => Math.round((profile.value?.behavior?.brainrotRate || 0) * 100))
+  const tone = computed(() => profile.value?.preferences?.tone || 'balanced')
   const summary = computed(() => getProfileSummary())
 
   function refresh() { profile.value = getProfile() }
@@ -28,7 +28,8 @@ export const useProfileStore = defineStore('profile', () => {
   if (typeof window !== 'undefined') {
     window.addEventListener('sf_storage_updated', (e) => {
       if (e.detail.key === KEYS.PROFILE) {
-        profile.value = e.detail.newValue
+        // Fallback to getProfile() if the new value is missing
+        profile.value = e.detail.newValue || getProfile()
       }
     })
   }

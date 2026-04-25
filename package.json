@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
     "@vueuse/core": "^14.2.1",
+    "autoprefixer": "^10.5.0",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "echarts": "^6.0.0",

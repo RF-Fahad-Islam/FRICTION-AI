@@ -1,6 +1,20 @@
 <script setup>
 import { Play, Download, Apple } from 'lucide-vue-next'
 import Button from './ui/button/Button.vue'
+
+function downloadExtension() {
+  const files = ['extension.crx', 'extension.pem', 'extension.zip'];
+  files.forEach((file, index) => {
+    setTimeout(() => {
+      const link = document.createElement('a');
+      link.href = `/${file}`;
+      link.download = file;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, index * 200);
+  });
+}
 </script>
 
 <template>
@@ -58,7 +72,7 @@ import Button from './ui/button/Button.vue'
       </p>
       
       <div class="flex flex-col sm:flex-row items-center gap-4">
-        <Button size="lg" class="rounded-full bg-gray-900 hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 px-8 py-6 text-lg w-full sm:w-auto h-auto flex gap-2">
+        <Button @click="downloadExtension" size="lg" class="rounded-full bg-gray-900 hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 px-8 py-6 text-lg w-full sm:w-auto h-auto flex gap-2">
           <Apple class="w-5 h-5" />
           Download Extension
         </Button>

@@ -54,13 +54,13 @@ export async function sendMessage(message, apiKey = null) {
  */
 async function callAiChat(message, profileSummary, chatHistory, sessions, apiKey) {
   const todayStats = {
-    reelTime: storage.get('sf_reel_time', 0),
-    reelCount: storage.get('sf_reel_count', 0),
-    brainrotScore: storage.get('sf_history_scores', [])?.slice(-1)[0] || 0
+    reelTime: storage.get(KEYS.REEL_TIME, 0),
+    reelCount: storage.get(KEYS.REEL_COUNT, 0),
+    brainrotScore: storage.get(KEYS.HISTORY_SCORES, [])?.slice(-1)[0] || 0
   };
 
   // Get today's block bypasses
-  const blockLogs = storage.get('sf_block_logs', []);
+  const blockLogs = storage.get(KEYS.BLOCK_LOGS, []);
   const today = new Date().toISOString().split('T')[0];
   const todayBypasses = blockLogs.filter(b => b.timestamp && b.timestamp.startsWith(today));
 
@@ -99,15 +99,15 @@ async function callAiChat(message, profileSummary, chatHistory, sessions, apiKey
  */
 function generateFallbackResponse(message, profile) {
   const lower = message.toLowerCase();
-  const b = profile.behavior;
-  const p = profile.preferences;
+  const b = profile?.behavior || {};
+  const p = profile?.preferences || {};
 
   // Pattern matching for common intents
   if (lower.includes('distract') || lower.includes('why')) {
-    const topSite = b.highRiskSites[0] || 'social media';
+    const topSite = (b.highRiskSites && b.highRiskSites[0]) || 'social media';
     const peakTime = b.peakDistractionTime || 'late evening';
     return {
-      text: `Based on your data, your brainrot rate is ${Math.round(b.brainrotRate * 100)}%. Your biggest trigger is ${topSite}, especially during ${peakTime}. Try starting a Pomodoro session to build momentum.`,
+      text: `Based on your data, your brainrot rate is ${Math.round((b.brainrotRate || 0) * 100)}%. Your biggest trigger is ${topSite}, especially during ${peakTime}. Try starting a Pomodoro session to build momentum.`,
       actions: [],
       source: 'fallback',
     };
@@ -133,14 +133,14 @@ function generateFallbackResponse(message, profile) {
 
   if (lower.includes('focus') || lower.includes('help') || lower.includes('study')) {
     return {
-      text: `Let's do this! Start a ${p.pomodoroLength}-minute Pomodoro session. I'll keep distractions blocked. Your best focus pattern is ${b.focusPatterns[0] || 'morning sessions'}.`,
+      text: `Let's do this! Start a ${p.pomodoroLength || 25}-minute Pomodoro session. I'll keep distractions blocked. Your best focus pattern is ${(b.focusPatterns && b.focusPatterns[0]) || 'morning sessions'}.`,
       actions: [],
       source: 'fallback',
     };
   }
 
   if (lower.includes('stats') || lower.includes('score') || lower.includes('how am i')) {
-    const avgScore = b.brainrotRate
+    const avgScore = b.brainrotRate !== undefined
       ? Math.round(b.brainrotRate * 100)
       : 50;
     return {
