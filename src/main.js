@@ -29,7 +29,13 @@ router.beforeEach((to, from, next) => {
   }
 })
 
+import { syncFromChrome } from '../storage/storageAdapter.js'
+
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
-app.mount('#app')
+
+// Initialize storage before mounting
+syncFromChrome().then(() => {
+  app.mount('#app')
+})

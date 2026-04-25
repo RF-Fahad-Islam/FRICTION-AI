@@ -157,3 +157,37 @@ export function calculateBrainrotScore(metrics, now = new Date()) {
   
   return clamp(Math.round(score), 0, 100);
 }
+
+/**
+ * Get dynamic scroll friction level based on session time and behavior.
+ * 
+ * @param {number} baseLevel - User's friction tolerance (1-5)
+ * @param {number} sessionTimeSeconds - Time spent on current site
+ * @param {number} scrollCount - Number of scrolls/reels consumed
+ * @param {Date} [now=new Date()]
+ * @returns {number} Dynamic level (1-5)
+ */
+export function calculateDynamicScrollFriction(baseLevel, sessionTimeSeconds, scrollCount, now = new Date()) {
+  const hour = now.getHours();
+  let dynamicLevel = baseLevel;
+  const sessionMinutes = sessionTimeSeconds / 60;
+  
+  // Time escalation: Increase by 1 level every 5 minutes on brainrot sites
+  if (sessionMinutes > 5) {
+    const timeEscalation = Math.min(Math.floor(sessionMinutes / 5), 2);
+    dynamicLevel += timeEscalation;
+  }
+  
+  // Scroll count escalation: +1 level for every 10 consecutive reels
+  if (scrollCount > 10) {
+    const scrollEscalation = Math.min(Math.floor(scrollCount / 10), 1);
+    dynamicLevel += scrollEscalation;
+  }
+  
+  // Peak hours (22:00-02:00): Stricter by default
+  if (hour >= 22 || hour <= 2) {
+    dynamicLevel = Math.min(dynamicLevel + 1, 5);
+  }
+  
+  return clamp(dynamicLevel, 1, 5);
+}

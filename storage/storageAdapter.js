@@ -1,38 +1,8 @@
 /**
  * Storage Adapter (Module M12)
- * Unified storage interface — localStorage for MVP, swappable to Supabase.
+ * Unified storage interface — localStorage for extension/dashboard sync.
  */
-import { supabase } from '@/lib/supabaseClient'
-
 const STORAGE_PREFIX = 'sf_';
-
-let currentUser = null;
-supabase.auth.getSession().then(({ data: { session } }) => {
-  currentUser = session?.user || null;
-});
-supabase.auth.onAuthStateChange((_event, session) => {
-  currentUser = session?.user || null;
-});
-
-// Helper to push to Supabase without blocking UI
-async function syncToSupabase(table, payload) {
-  if (!currentUser) return;
-  try {
-    // If payload doesn't have a user_id, attach it
-    const data = Array.isArray(payload) 
-      ? payload.map(p => ({ ...p, user_id: currentUser.id }))
-      : { ...payload, user_id: currentUser.id };
-    
-    // Profiles table is keyed by 'id'
-    if (table === 'profiles') {
-      await supabase.from(table).upsert({ id: currentUser.id, ...data });
-    } else {
-      await supabase.from(table).insert(data);
-    }
-  } catch (err) {
-    console.warn(`[Storage] Failed to sync ${table} to Supabase:`, err.message);
-  }
-}
 
 /**
  * Storage keys
@@ -64,6 +34,9 @@ const LIMITS = {
  * @returns {*}
  */
 export function get(key, defaultValue = null) {
+  // If we're in a Chrome extension, we might want to use chrome.storage.local
+  // But since get() is sync, we check localStorage first.
+  // We will add a sync process to keep localStorage and chrome.storage in sync.
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return defaultValue;
@@ -82,13 +55,12 @@ export function set(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     
-    // Sync specific keys to Supabase
-    if (key === KEYS.PROFILE) {
-      syncToSupabase('profiles', value);
+    // Sync to chrome.storage if available
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ [key]: value });
     }
   } catch (e) {
     console.warn('[Storage] Write failed:', e.message);
-    // If quota exceeded, try to prune old data
     if (e.name === 'QuotaExceededError') {
       pruneOldData();
       localStorage.setItem(key, JSON.stringify(value));
@@ -105,7 +77,6 @@ export function append(key, item) {
   const arr = get(key, []);
   arr.push(item);
 
-  // Enforce limits
   const limit = LIMITS[key];
   if (limit && arr.length > limit) {
     arr.splice(0, arr.length - limit);
@@ -114,10 +85,10 @@ export function append(key, item) {
   try {
     localStorage.setItem(key, JSON.stringify(arr));
     
-    // Async sync the single item to Supabase to avoid pushing whole array
-    if (key === KEYS.SESSIONS) syncToSupabase('sessions', item);
-    if (key === KEYS.VISITS) syncToSupabase('visits', item);
-    if (key === KEYS.FRICTION_LOG) syncToSupabase('friction_events', item);
+    // Sync to chrome.storage if available
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({ [key]: arr });
+    }
 
   } catch (e) {
     if (e.name === 'QuotaExceededError') {
@@ -125,6 +96,25 @@ export function append(key, item) {
       localStorage.setItem(key, JSON.stringify(arr));
     }
   }
+}
+
+/**
+ * Sync entire storage from chrome.storage.local to localStorage.
+ * Call this on app initialization.
+ */
+export async function syncFromChrome() {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
+
+  return new Promise((resolve) => {
+    chrome.storage.local.get(null, (data) => {
+      Object.entries(data).forEach(([key, value]) => {
+        if (key.startsWith(STORAGE_PREFIX)) {
+          localStorage.setItem(key, JSON.stringify(value));
+        }
+      });
+      resolve();
+    });
+  });
 }
 
 /**
@@ -143,6 +133,9 @@ export function update(key, updates) {
  */
 export function remove(key) {
   localStorage.removeItem(key);
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.remove(key);
+  }
 }
 
 /**

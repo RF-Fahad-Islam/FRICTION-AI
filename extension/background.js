@@ -6,6 +6,7 @@
 import { calculateFrictionLevel, FRICTION_LEVELS, calculateBrainrotScore } from './logic/adaptiveFriction.js';
 import { generateFrictionProfile } from './logic/frictionProfile.js';
 import { frictionDecisionPrompt } from './services/aiPrompts.js';
+import { categorize, CATEGORIES, needsAiFallback } from './logic/categorizer.js';
 
 // Brainrot URL patterns
 const BRAINROT_PATTERNS = [
@@ -36,6 +37,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'LOG_SCROLL_REASON':
       logScrollReason(msg.payload);
       break;
+    case 'BLOCK_BYPASS':
+      handleBlockBypass(msg.payload);
+      break;
+    case 'GET_CATEGORY':
+      getSiteCategory(msg.payload.url).then(sendResponse);
+      return true;
     case 'REEL_WATCHED':
     case 'UPDATE_REEL_COUNT':
       chrome.storage.local.get(['sf_reel_count', 'sf_hourly_reels'], (data) => {
@@ -131,13 +138,23 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+// Hourly metrics key generator
+function getHourlyKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hour = date.getHours().toString().padStart(2, '0');
+  return `${year}-${month}-${day}-${hour}`;
+}
+
 // Periodic tracking every 1 second
 setInterval(() => {
   if (activeTabInfo.domain) {
     // 1. Update cumulative domain activity
-    chrome.storage.local.get(['sf_daily_activity', 'sf_reel_time'], (data) => {
+    chrome.storage.local.get(['sf_daily_activity', 'sf_reel_time', 'sf_hourly_metrics'], (data) => {
       let activity = data.sf_daily_activity || {};
       let reelTime = data.sf_reel_time || 0;
+      let hourlyMetrics = data.sf_hourly_metrics || {};
       
       if (!activity[activeTabInfo.domain]) {
         activity[activeTabInfo.domain] = { timeSpent: 0, isBrainrot: activeTabInfo.isBrainrot };
@@ -149,9 +166,27 @@ setInterval(() => {
         reelTime += 1;
       }
       
+      const hourlyKey = getHourlyKey();
+      if (!hourlyMetrics[hourlyKey]) {
+        hourlyMetrics[hourlyKey] = { focusTime: 0, brainrotTime: 0 };
+      }
+      if (activeTabInfo.isBrainrot) {
+        hourlyMetrics[hourlyKey].brainrotTime += 1;
+      } else {
+        hourlyMetrics[hourlyKey].focusTime += 1;
+      }
+      
+      // Keep only last 7 days of hourly data
+      const keys = Object.keys(hourlyMetrics).sort();
+      while (keys.length > 24 * 7) {
+        delete hourlyMetrics[keys[0]];
+        keys.shift();
+      }
+      
       chrome.storage.local.set({ 
         sf_daily_activity: activity,
-        sf_reel_time: reelTime
+        sf_reel_time: reelTime,
+        sf_hourly_metrics: hourlyMetrics
       });
     });
 
@@ -222,6 +257,43 @@ async function updateFrictionProfile(sessions) {
 }
 
 function checkUrl(url, tabId) {
+  const domain = extractDomain(url);
+  
+  // Check blocked domains first (highest priority)
+  chrome.storage.local.get('sf_profile', async (data) => {
+    const profile = data.sf_profile || {};
+    const blockedDomains = profile?.preferences?.blockedDomains || [];
+    
+    // Check if domain is blocked (with cooldown check)
+    if (blockedDomains.includes(domain)) {
+      const bypassData = await chrome.storage.local.get('sf_block_bypass');
+      const bypasses = bypassData.sf_block_bypass || [];
+      
+      // Check if recently bypassed (within 15 min)
+      const recentBypass = bypasses.find(b => 
+        b.domain === domain && 
+        Date.now() - b.timestamp < 15 * 60 * 1000
+      );
+      
+      if (!recentBypass) {
+        // Block - send soft block popup
+        chrome.tabs.sendMessage(tabId, {
+          type: 'SHOW_SOFT_BLOCK',
+          payload: { domain, url }
+        }).catch(() => {});
+        return;
+      } else {
+        // Bypass active - allow but show reduced friction
+        chrome.tabs.sendMessage(tabId, {
+          type: 'ACTIVATE_DETECTION',
+          payload: { baseScore: 20, url }
+        }).catch(() => {});
+        return;
+      }
+    }
+  });
+  
+  // Then check brainrot patterns
   let isBrainrot = false;
   for (const p of BRAINROT_PATTERNS) {
     if (p.pattern.test(url)) {
@@ -407,4 +479,51 @@ async function getDynamicAiPrompt({ reels, timeSpent }) {
     console.error('AI Prompt Error:', e);
     return { text: `You've hit ${reels} reels. Time to evaluate your intent.` };
   }
+}
+
+async function handleBlockBypass(payload) {
+  const { domain, reason, duration } = payload;
+  const bypasses = (await chrome.storage.local.get('sf_block_bypass')).sf_block_bypass || [];
+  
+  bypasses.push({
+    domain,
+    reason,
+    duration: duration || 10,
+    timestamp: Date.now()
+  });
+  
+  // Keep only last 50 bypasses
+  if (bypasses.length > 50) bypasses.shift();
+  
+  await chrome.storage.local.set({ sf_block_bypass: bypasses });
+  
+  // Log for dashboard
+  const blockLogs = (await chrome.storage.local.get('sf_block_logs')).sf_block_logs || [];
+  blockLogs.push({
+    domain,
+    reason,
+    timestamp: new Date().toISOString()
+  });
+  if (blockLogs.length > 200) blockLogs.splice(0, blockLogs.length - 200);
+  await chrome.storage.local.set({ sf_block_logs: blockLogs });
+}
+
+async function getSiteCategory(url) {
+  const domain = extractDomain(url);
+  
+  // Check cached categories first
+  const cached = (await chrome.storage.local.get('sf_site_categories')).sf_site_categories || {};
+  if (cached[domain]) {
+    return cached[domain];
+  }
+  
+  // Use rule-based categorizer
+  const { categorize } = await import('./logic/categorizer.js');
+  const result = categorize(url);
+  
+  // Save to cache
+  cached[domain] = result.category;
+  await chrome.storage.local.set({ sf_site_categories: cached });
+  
+  return result.category;
 }

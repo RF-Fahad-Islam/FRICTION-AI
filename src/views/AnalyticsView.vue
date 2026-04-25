@@ -53,7 +53,7 @@ async function syncHistory() {
         url: item.url,
         title: item.title,
         timestamp: new Date(item.lastVisitTime || Date.now()).toISOString(),
-        timeSpent: 0, // chrome.history doesn't provide time spent easily
+        timeSpent: 0, 
         category: cat,
         confidence: confidence
       }
@@ -64,7 +64,6 @@ async function syncHistory() {
     visits.value = newVisits
   } catch (err) {
     console.error('Failed to sync history:', err)
-    alert('Failed to sync history. Check console.')
   } finally {
     isSyncing.value = false
   }
@@ -78,8 +77,10 @@ function saveApiKey() {
 // Group visits by category
 const groupedVisits = computed(() => {
   const groups = {}
+  if (!visits.value || !Array.isArray(visits.value)) return groups;
   
   visits.value.forEach(visit => {
+    if (!visit) return
     const cat = visit.category || CATEGORIES.UNKNOWN
     if (!groups[cat]) {
       groups[cat] = []
@@ -97,7 +98,10 @@ const groupedVisits = computed(() => {
 
 // Categories that actually have visits
 const activeCategories = computed(() => {
-  return Object.keys(groupedVisits.value).filter(k => groupedVisits.value[k].length > 0)
+  return Object.keys(groupedVisits.value).filter(k => {
+    const group = groupedVisits.value[k];
+    return group && group.length > 0;
+  })
 })
 
 const expandedCategory = ref(null)

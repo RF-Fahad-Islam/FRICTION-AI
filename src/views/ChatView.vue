@@ -1,10 +1,16 @@
 <script setup>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 import { useChatStore } from '../stores/chatStore.js'
+import { useActivityStore } from '../stores/activityStore.js'
+import { useProfileStore } from '../stores/profileStore.js'
 
 const chatStore = useChatStore()
+const activityStore = useActivityStore()
+const profileStore = useProfileStore()
 const input = ref('')
 const messagesContainer = ref(null)
+const showApiKeyPrompt = ref(false)
+const tempApiKey = ref('')
 
 const suggestions = [
   'Why am I distracted?',
@@ -12,6 +18,13 @@ const suggestions = [
   'Be stricter with me',
   'Show my stats',
 ]
+
+onMounted(() => {
+  activityStore.fetchStats()
+  if (!profileStore.profile?.preferences?.apiKey) {
+    showApiKeyPrompt.value = true
+  }
+})
 
 async function send() {
   const text = input.value.trim()
@@ -33,6 +46,13 @@ function scrollToBottom() {
   }
 }
 
+function saveApiKey() {
+  if (tempApiKey.value.trim()) {
+    profileStore.setPreference('apiKey', tempApiKey.value.trim())
+    showApiKeyPrompt.value = false
+  }
+}
+
 watch(() => chatStore.messages.length, () => nextTick(scrollToBottom))
 </script>
 
@@ -46,6 +66,21 @@ watch(() => chatStore.messages.length, () => nextTick(scrollToBottom))
 
     <!-- Messages -->
     <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6 space-y-4">
+      <!-- Status Bar -->
+      <div class="grid grid-cols-3 gap-3 mb-6 animate-slide-down">
+        <div class="glass-card p-3 text-center border-b-2 border-primary">
+          <div class="text-[10px] text-text-muted uppercase font-bold tracking-widest">Focus</div>
+          <div class="text-xl font-bold text-text-primary">{{ 100 - activityStore.todayBrainrotScore }}%</div>
+        </div>
+        <div class="glass-card p-3 text-center border-b-2 border-accent">
+          <div class="text-[10px] text-text-muted uppercase font-bold tracking-widest">Reels</div>
+          <div class="text-xl font-bold text-accent">{{ activityStore.reelCount }}</div>
+        </div>
+        <div class="glass-card p-3 text-center border-b-2 border-secondary">
+          <div class="text-[10px] text-text-muted uppercase font-bold tracking-widest">Time</div>
+          <div class="text-xl font-bold text-secondary">{{ Math.floor(activityStore.reelTime / 60) }}m</div>
+        </div>
+      </div>
       <!-- Welcome message -->
       <div v-if="!chatStore.hasMessages" class="flex flex-col items-center justify-center h-full text-center">
         <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 animate-float">
@@ -128,6 +163,41 @@ watch(() => chatStore.messages.length, () => nextTick(scrollToBottom))
           </svg>
         </button>
       </form>
+    </div>
+
+    <!-- API Key Prompt Modal -->
+    <div v-if="showApiKeyPrompt" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div class="glass-card max-w-md w-full p-8 space-y-6 shadow-2xl border-primary/20 animate-slide-up">
+        <div class="text-center">
+          <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-primary-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-text-primary">Gemini API Key Required</h2>
+          <p class="text-sm text-text-muted mt-2">Enter your Gemini API key for personalized AI coaching. Your key stays local.</p>
+        </div>
+
+        <div class="space-y-4">
+          <input 
+            v-model="tempApiKey"
+            type="password" 
+            placeholder="Paste your API key here..."
+            class="w-full bg-surface-900 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+            @keyup.enter="saveApiKey"
+          />
+          <button 
+            @click="saveApiKey"
+            class="w-full px-4 py-3 rounded-xl text-sm font-medium bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20 transition-all"
+          >
+            Save & Continue
+          </button>
+        </div>
+
+        <p class="text-[10px] text-center text-text-muted">
+          Get free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-primary-light hover:underline">Google AI Studio</a>
+        </p>
+      </div>
     </div>
   </div>
 </template>

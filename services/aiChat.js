@@ -8,7 +8,7 @@ import { getProfile, updateProfile, getProfileSummary } from '../profile/profile
 import * as storage from '../storage/storageAdapter.js';
 import { KEYS } from '../storage/storageAdapter.js';
 
-const API_TIMEOUT = 8000;
+const API_TIMEOUT = 15000;
 
 /**
  * Send a chat message and get a response.
@@ -53,15 +53,25 @@ export async function sendMessage(message, apiKey = null) {
  * Call the AI API for chat.
  */
 async function callAiChat(message, profileSummary, chatHistory, sessions, apiKey) {
+  const todayStats = {
+    reelTime: storage.get('sf_reel_time', 0),
+    reelCount: storage.get('sf_reel_count', 0),
+    brainrotScore: storage.get('sf_history_scores', [])?.slice(-1)[0] || 0
+  };
+
+  // Get today's block bypasses
+  const blockLogs = storage.get('sf_block_logs', []);
+  const today = new Date().toISOString().split('T')[0];
+  const todayBypasses = blockLogs.filter(b => b.timestamp && b.timestamp.startsWith(today));
+
   const prompt = chatPrompt(
     message,
     profileSummary,
     chatHistory.map(m => ({ role: m.role, content: m.content })),
-    sessions.slice(-3)
+    sessions.slice(-3),
+    todayStats,
+    todayBypasses
   );
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
@@ -70,7 +80,7 @@ async function callAiChat(message, profileSummary, chatHistory, sessions, apiKey
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(prompt),
-      signal: controller.signal,
+      signal: AbortSignal.timeout(API_TIMEOUT),
     });
 
     if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -79,8 +89,8 @@ async function callAiChat(message, profileSummary, chatHistory, sessions, apiKey
     const parsed = parseAiResponse(rawText);
 
     return { ...parsed, source: 'ai' };
-  } finally {
-    clearTimeout(timeout);
+  } catch (err) {
+    throw err;
   }
 }
 

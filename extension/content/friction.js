@@ -8,11 +8,11 @@
  *  4. Relentless Transparency — persistent un-closable session timer on screen
  */
 
-(function() {
+(function () {
   'use strict';
 
   let config = null;
-  
+
   function isContextValid() {
     return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
   }
@@ -26,21 +26,21 @@
   let currentDomain = null;
   let currentUrl = window.location.href;
   let reelCount = 0;        // consecutive reels watched
-  let isScrollLocked = false;
+
 
   // SPA Navigation Detection for Reel Counting (Accurate tracking)
   const checkUrlChange = () => {
     if (window.location.href !== currentUrl) {
       currentUrl = window.location.href;
       const isReelPath = (url) => url.includes('/shorts/') || url.includes('/reels/') || url.includes('/reel/');
-      
+
       if (isReelPath(currentUrl)) {
         reelCount++;
         if (isContextValid()) {
-          chrome.runtime.sendMessage({ type: 'UPDATE_REEL_COUNT', payload: { count: reelCount } }).catch(() => {});
+          chrome.runtime.sendMessage({ type: 'UPDATE_REEL_COUNT', payload: { count: reelCount } }).catch(() => { });
         }
         checkIntentIntercept();
-        // Removed flow-break flash and lock as it caused jittery experience
+
       }
     }
   };
@@ -48,14 +48,14 @@
   setInterval(checkUrlChange, 500); // High frequency check
   window.addEventListener('popstate', checkUrlChange);
   window.addEventListener('hashchange', checkUrlChange);
-  
+
   const originalPushState = history.pushState;
-  history.pushState = function() {
+  history.pushState = function () {
     originalPushState.apply(this, arguments);
     checkUrlChange();
   };
   const originalReplaceState = history.replaceState;
-  history.replaceState = function() {
+  history.replaceState = function () {
     originalReplaceState.apply(this, arguments);
     checkUrlChange();
   };
@@ -75,13 +75,14 @@
   window.addEventListener('sf-friction-config', (e) => {
     const newConfig = e.detail;
     const domain = window.location.hostname;
+    const baseLevel = newConfig.level || 2;
 
     // Only reset session if we changed domains or it's a fresh start
     if (!sessionStartTime || domain !== currentDomain) {
       sessionStartTime = Date.now();
       currentDomain = domain;
       reelCount = 0;
-      
+
       // Start/Restart effects
       startDopamineDesaturation();
       startTransparencyTimer();
@@ -89,9 +90,10 @@
 
     config = newConfig;
 
-    // Heavy Scrolling (always refresh friction level)
+    // Heavy Scrolling with dynamic friction based on session time
     if (config.level >= 2) {
-      applyScrollFriction(config.level);
+      const sessionTimeSeconds = sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0;
+      applyScrollFriction(baseLevel, sessionTimeSeconds, reelCount);
     }
   });
 
@@ -101,47 +103,42 @@
     stopDopamineDesaturation();
     removeGrayscaleLock();
     removeTransparencyTimer();
-    document.documentElement.style.overflow = '';
-    document.body.style.overflow = '';
     config = null;
+    sessionStartTime = null;
+    reelCount = 0;
+    // Intent intercept is handled in checkIntentIntercept based on reelCount
   });
 
-  // React to brainrot alerts
-  window.addEventListener('sf-brainrot-alert', (e) => {
-    if (isInCooldown || Date.now() < intentPopupCooldown) return;
-    const { score, forceIntent } = e.detail;
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  1. HEAVY SCROLLING — Fill-bar must fill before advancing to next reel
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    if (!config) return;
-
-    if (forceIntent) {
-      showIntentPopup(e.detail);
-      return;
-    }
-
-    if (config.level >= 4) {
-      showCooldownOverlay(e.detail);
-    } else if (config.level >= 3) {
-      showWarningOverlay(e.detail);
-    } else if (config.level >= 2) {
-      showIntentPopup(e.detail);
-    }
-  });
-
-
-
-  /** Apply scroll friction by capturing wheel/touch events and requiring physical distance */
-  function applyScrollFriction(level) {
+  function applyScrollFriction(baseLevel, sessionTimeSeconds = 0, scrollCount = 0) {
     if (blockScrollHandler) return;
     let scrollAccumulator = 0;
 
+    // Dynamic: escalation based on session time
+    const sessionMinutes = sessionTimeSeconds / 60;
+    let dynamicLevel = baseLevel;
+    
+    // Time escalation: +1 every 5 min
+    if (sessionMinutes > 5) {
+      dynamicLevel = Math.min(dynamicLevel + Math.floor(sessionMinutes / 5), 5);
+    }
+    // Reel count escalation: +1 every 10 reels
+    if (scrollCount > 10) {
+      dynamicLevel = Math.min(dynamicLevel + Math.floor(scrollCount / 10), 5);
+    }
+    // Peak hours (22:00-02:00) stricter
+    const hour = new Date().getHours();
+    if (hour >= 22 || hour <= 2) {
+      dynamicLevel = Math.min(dynamicLevel + 1, 5);
+    }
+
+    const level = dynamicLevel;
+
     blockScrollHandler = (e) => {
-      // Hard-lock if intercept is active or Level 5
-      if (isScrollLocked || (config && config.level === 5)) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        return false;
-      }
+
 
       const baseDelta = 150 + level * 130;
       const growthFactor = 1 + (Math.floor(reelCount / 3) * 0.2);
@@ -151,8 +148,9 @@
         const delta = Math.abs(e.deltaY);
         if (e.deltaY === 0) return;
 
-        // Removed Sticky Friction counter-scroll as it caused jittery "not smooth" scrolling
-        // Only accumulating delta now to show the fill bar progress
+        // Sticky Friction: Apply a "Gravity Pull" in opposite direction
+        const resistanceScale = 0.05 * level;
+        window.scrollBy(0, -e.deltaY * resistanceScale);
 
         scrollAccumulator += delta;
         const progress = Math.min(scrollAccumulator, requiredDelta);
@@ -168,7 +166,7 @@
           scrollAccumulator = 0;
           hideFillBar();
           hideNextPreview();
-          return; 
+          return;
         } else {
           e.preventDefault();
           e.stopPropagation();
@@ -179,7 +177,8 @@
         if (e.type === 'touchmove') {
           createFillBar();
           fillBarEl.classList.add('sf-visible');
-          // Removed touch jitter for smoother experience
+          // Add touch jitter
+          if (Math.random() > 0.8) window.scrollBy(0, (Math.random() - 0.5) * 10);
         }
       }
     };
@@ -191,17 +190,11 @@
   }
 
   function keydownBlocker(e) {
-    if (isScrollLocked) {
+
+    const blockedKeys = ['ArrowUp', 'ArrowDown', 'Space', 'PageUp', 'PageDown'];
+    if (blockedKeys.includes(e.code)) {
       e.preventDefault();
       e.stopPropagation();
-      e.stopImmediatePropagation();
-      return;
-    }
-    const blockedKeys = ['ArrowUp', 'ArrowDown', 'Space', 'PageUp', 'PageDown', 'Home', 'End'];
-    if (blockedKeys.includes(e.code) || blockedKeys.includes(e.key)) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
       createFillBar();
       fillBarEl.classList.add('sf-visible');
       setTimeout(() => { if (!blockScrollHandler) hideFillBar(); }, 800);
@@ -265,32 +258,29 @@
     }
 
     // Hard-lock at 10th reel
-    if (reelCount >= 10 && !isScrollLocked && Date.now() > intentPopupCooldown) {
+    if (reelCount >= 10 && Date.now() > intentPopupCooldown) {
       if (isContextValid()) {
-        chrome.runtime.sendMessage({ 
-          type: 'GET_AI_PROMPT', 
-          payload: { reels: reelCount, timeSpent: (Date.now() - sessionStartTime) / 1000 } 
+        chrome.runtime.sendMessage({
+          type: 'GET_AI_PROMPT',
+          payload: { reels: reelCount, timeSpent: (Date.now() - sessionStartTime) / 1000 }
         }, (response) => {
           if (response && response.text) {
-            lockScrollAndShowIntercept(response.text);
+            showIntentIntercept(response.text);
           } else {
-            lockScrollAndShowIntercept();
+            showIntentIntercept();
           }
         });
       } else {
-        lockScrollAndShowIntercept();
+        showIntentIntercept();
       }
     }
   }
 
-  function lockScrollAndShowIntercept(dynamicMessage) {
-    isScrollLocked = true;
-    showIntentIntercept(dynamicMessage);
-  }
+
 
   function showIntentIntercept(dynamicMessage) {
     if (document.getElementById('sf-overlay')) return;
-    
+
     const message = dynamicMessage || `You've watched <strong>${reelCount} reels</strong>. Is this intentional?`;
 
     overlayEl = createOverlay(`
@@ -320,7 +310,7 @@
         }
 
         // Unlock — add a cooldown before intercept fires again
-        isScrollLocked = false;
+
         reelCount = 0;
         intentPopupCooldown = Date.now() + (reason === 'break' || reason === 'learning' ? 300000 : 120000);
         removeOverlay();
@@ -340,7 +330,7 @@
     timerOverlayEl.className = 'sf-transparency-timer';
     timerOverlayEl.innerHTML = `
       <div class="sf-timer-inner">
-        <span class="sf-timer-label">Time in void</span>
+        <span class="sf-timer-label" id="sf-timer-category"></span>
         <span class="sf-timer-clock" id="sf-timer-clock">00:00</span>
       </div>
     `;
@@ -360,7 +350,7 @@
       const clockEl = document.getElementById('sf-timer-clock');
       if (clockEl) {
         clockEl.textContent = formatTime(elapsed);
-        
+
         // Intensify feedback after 5 minutes
         if (elapsed > 300) {
           clockEl.classList.add('sf-pulsing');
@@ -385,6 +375,22 @@
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
+  }
+
+  function updateTimerCategory(category) {
+    const labelEl = document.getElementById('sf-timer-category');
+    if (labelEl) {
+      const labels = {
+        productivity: '💼 Productive',
+        learning: '📚 Learning',
+        entertainment: '🎬 Entertainment',
+        timeWaste: '⏳ Time Waste',
+        brainrot: '🧟 Brainrot',
+        mixed: '🔀 Mixed',
+        unknown: '❓ Unknown'
+      };
+      labelEl.textContent = labels[category] || labels.unknown;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -429,21 +435,17 @@
   function showCooldownOverlay(data) {
     if (document.getElementById('sf-overlay')) return;
     isInCooldown = true;
-    let countdown = config?.config?.cooldown || 120;
-    
-    // Hide scrollbar during cooldown (loophole closure)
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
+    let countdown = config?.config?.cooldown || 60;
 
     overlayEl = createOverlay(`
       <div class="sf-card sf-card-cooldown">
         <div class="sf-icon">🧊</div>
-        <h2>Focus Lockdown</h2>
-        <p class="sf-score">Score: <strong class="sf-danger">${data.score}</strong> — You are currently in a mandatory cooldown.</p>
+        <h2>Cooldown Active</h2>
+        <p class="sf-score">Score: <strong class="sf-danger">${data.score}</strong> — Take a breather.</p>
         <div class="sf-countdown" id="sf-countdown">${formatTime(countdown)}</div>
-        <p class="sf-subtext sf-quote">"The only way to do great work is to love what you do."</p>
+        <p class="sf-subtext sf-quote">"The ability to focus is the most important skill for the 21st century."</p>
       </div>
-    `, 0.98); // Almost full opacity
+    `, 0.85);
 
     const countdownEl = overlayEl.querySelector('#sf-countdown');
     const timer = setInterval(() => {
@@ -452,8 +454,6 @@
       if (countdown <= 0) {
         clearInterval(timer);
         isInCooldown = false;
-        document.documentElement.style.overflow = '';
-        document.body.style.overflow = '';
         removeOverlay();
       }
     }, 1000);
@@ -535,9 +535,6 @@
       el.classList.remove('sf-visible');
       setTimeout(() => el.remove(), 300);
     }
-    // Restore scrollbar just in case it was locked by Level 5 or Cooldown
-    document.documentElement.style.overflow = '';
-    document.body.style.overflow = '';
     overlayEl = null;
   }
 
@@ -586,5 +583,54 @@
     if (previewEl) previewEl.classList.remove('sf-visible');
   }
 
-  // Removed applyFlowBreak as it was too intrusive and caused blue overlay complaints
+  // Soft Block Message Handler
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'SHOW_SOFT_BLOCK') {
+      showSoftBlock(msg.payload);
+    }
+  });
+
+  function showSoftBlock({ domain }) {
+    if (document.getElementById('sf-overlay')) return;
+
+    overlayEl = createOverlay(`
+      <div class="sf-card sf-card-blocked">
+        <div class="sf-icon">🚫</div>
+        <h2>Site Blocked</h2>
+        <p class="sf-score"><strong>${domain}</strong> is on your blocklist.</p>
+        <p class="sf-subtext">Why are you visiting this site?</p>
+        <div class="sf-buttons">
+          <button class="sf-btn sf-btn-secondary" data-action="productive">💼 Productive Task</button>
+          <button class="sf-btn sf-btn-secondary" data-action="quick_check">👀 Quick Check (2min)</button>
+          <button class="sf-btn sf-btn-primary" data-action="add_time">⏱️ Add 10 mins</button>
+          <button class="sf-btn sf-btn-secondary" data-action="take_break">🧘 Take a Break</button>
+        </div>
+      </div>
+    `, 0.85);
+
+    overlayEl.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        const reason = action;
+        let duration = 0;
+        
+        if (action === 'quick_check') duration = 2;
+        else if (action === 'add_time') duration = 10;
+        
+        if (isContextValid()) {
+          chrome.runtime.sendMessage({
+            type: 'BLOCK_BYPASS',
+            payload: { domain, reason, duration }
+          });
+        }
+
+        if (action === 'take_break') {
+          history.back();
+        }
+        
+        removeOverlay();
+      });
+    });
+  }
+
 })();

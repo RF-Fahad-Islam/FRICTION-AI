@@ -217,7 +217,6 @@ export function getCategoryColor(category) {
     [CATEGORIES.NEWS]: '#81ECEC',
     [CATEGORIES.UNKNOWN]: '#636E72',
   };
-  if (!category) return colors[CATEGORIES.UNKNOWN];
   if (colors[category]) return colors[category];
 
   // Generate a consistent pseudo-random color based on string hash

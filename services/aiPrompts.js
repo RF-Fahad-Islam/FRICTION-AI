@@ -8,7 +8,7 @@
  */
 export function classifyPrompt(url, title, timeSpent, scrollCount) {
   return {
-    systemInstruction: {
+    system_instruction: {
       role: 'system',
       parts: [{ text: `You are a browsing activity classifier for a focus app. Classify the user's activity into exactly one category.
 
@@ -47,7 +47,7 @@ export function summarizePrompt(sessions, profileSummary) {
   }));
 
   return {
-    systemInstruction: {
+    system_instruction: {
       role: 'system',
       parts: [{ text: `You are a focus coach generating session summaries. Be concise and actionable.
 User profile:\n${profileSummary}
@@ -76,10 +76,22 @@ Respond with ONLY valid JSON without markdown formatting:
 /**
  * Chat prompt with system context.
  */
-export function chatPrompt(userMessage, profileSummary, chatHistory, recentSessions) {
+export function chatPrompt(userMessage, profileSummary, chatHistory, recentSessions, todayStats = {}, blockBypasses = []) {
+  const todayContext = `
+Today's Stats:
+- Reels Watched: ${todayStats.reelCount || 0}
+- Reel Time: ${Math.round((todayStats.reelTime || 0) / 60)} min
+- Today's Brainrot Ratio: ${todayStats.brainrotScore || 0}%
+`;
+
   const sessionContext = recentSessions.slice(0, 3).map(s =>
     `${s.type} session: ${Math.round(s.duration / 60)}min, brainrot: ${s.totalBrainrotScore}`
   ).join('\n');
+
+  const blockContext = blockBypasses.length > 0
+    ? `Block Bypasses (today):
+${blockBypasses.map(b => `- ${b.domain}: ${b.reason} (${b.timestamp})`).join('\n')}`
+    : 'Block Bypasses: None today';
 
   // Convert chatHistory to Gemini format
   const formattedHistory = chatHistory.slice(-6).map(m => ({
@@ -88,12 +100,16 @@ export function chatPrompt(userMessage, profileSummary, chatHistory, recentSessi
   }));
 
   return {
-    systemInstruction: {
+    system_instruction: {
       role: 'system',
       parts: [{ text: `You are a focus coach for Study Friction AI. You help users understand and improve their attention habits.
 
 User Profile:
 ${profileSummary}
+
+${todayContext}
+
+${blockContext}
 
 Recent Activity:
 ${sessionContext || 'No recent sessions'}
@@ -149,7 +165,7 @@ export function parseAiResponse(responseText) {
 
 export function summarizeLinksPrompt(links, category) {
   return {
-    systemInstruction: {
+    system_instruction: {
       role: 'system',
       parts: [{ text: `You are a focus coach summarizing a user's browsing history for a specific category (${category}).
 Provide a brief, insightful summary of the content they consumed based on the URLs and titles.
@@ -174,28 +190,28 @@ Respond with ONLY valid JSON format. Do NOT wrap the JSON in markdown code block
 /**
  * Batch classification prompt.
  */
-export function batchClassifyPrompt(links) {
+export function batchClassifyPrompt(linksWithIds) {
   return {
-    systemInstruction: {
+    system_instruction: {
       role: 'system',
       parts: [{ text: `You are a web browsing classifier. Group the following URLs into specific, highly descriptive categories based on their content.
 You can create NEW categories that describe the content accurately (e.g., 'E-commerce', 'News', 'Web Development', 'Social Media', 'Health & Fitness', 'Banking', etc.).
 
-Respond with ONLY valid JSON format. Do NOT wrap the JSON in markdown code blocks like \`\`\`json. The response should start with { and end with }.
+Respond with ONLY valid JSON format. Do NOT wrap the JSON in markdown code blocks.
 {
   "classifications": [
-    { "url": "https://example.com/...", "category": "category_name" }
+    { "id": 1, "category": "category_name" }
   ]
 }` }]
     },
     contents: [
       {
         role: 'user',
-        parts: [{ text: `Links to classify:\n${JSON.stringify(links, null, 2)}` }]
+        parts: [{ text: `Links to classify (ID: Title - URL):\n${linksWithIds.map(l => `${l.id}: ${l.title} - ${l.url}`).join('\n')}` }]
       }
     ],
     generationConfig: {
-      temperature: 0.2,
+      temperature: 0.1,
       responseMimeType: "application/json",
     }
   };
@@ -206,7 +222,7 @@ Respond with ONLY valid JSON format. Do NOT wrap the JSON in markdown code block
  */
 export function frictionMessagePrompt(reels, timeSpent, tone, lastReason) {
   return {
-    systemInstruction: {
+    system_instruction: {
       role: 'system',
       parts: [{ text: `You are a focus coach for Study Friction AI. The user is doomscrolling reels.
 Generate a short, impactful message to show on their screen to snap them out of the trance.
@@ -239,7 +255,7 @@ Rules:
  */
 export function frictionDecisionPrompt(metrics, profile) {
   return {
-    systemInstruction: {
+    system_instruction: {
       role: 'system',
       parts: [{ text: `You are the Friction Intelligence Engine for Study Friction AI.
 Your job is to decide the optimal friction level (1-5) for a user based on their current behavior.

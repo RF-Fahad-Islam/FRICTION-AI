@@ -4,7 +4,7 @@ import { useActivityStore } from '../stores/activityStore.js'
 import { useProfileStore } from '../stores/profileStore.js'
 import * as storage from '../../storage/storageAdapter.js'
 import { KEYS } from '../../storage/storageAdapter.js'
-import { CATEGORIES, getCategoryLabel, getCategoryColor } from '../../logic/categorizer.js'
+import { CATEGORIES, getCategoryLabel, getCategoryColor, categorize, needsAiFallback } from '../../logic/categorizer.js'
 import { summarizeLinks, batchClassifyLinks } from '../../services/aiClassifier.js'
 
 // Components
@@ -35,6 +35,11 @@ const summaries = ref({})
 const isSummarizing = ref({})
 const isSyncing = ref(false)
 
+// Settings tab state
+const tempGoal = ref(profileStore.profile?.behavior?.dailyBrainrotGoal || 30)
+const newBlockedDomain = ref('')
+const blockedDomains = ref(profileStore.profile?.preferences?.blockedDomains || [])
+
 onMounted(() => {
   visits.value = storage.get(KEYS.VISITS, [])
   tempApiKey.value = profileStore.profile?.preferences?.apiKey || ''
@@ -47,65 +52,116 @@ function saveApiKey() {
   alert('API Key saved successfully! AI Friction is now active.')
 }
 
+function saveGoal() {
+  profileStore.update({ behavior: { dailyBrainrotGoal: tempGoal.value } })
+  profileStore.refresh()
+  alert('Goal saved!')
+}
+
+function addBlockedDomain() {
+  if (!newBlockedDomain.value) return
+  const domain = newBlockedDomain.value.trim().toLowerCase()
+  if (!blockedDomains.value.includes(domain)) {
+    blockedDomains.value.push(domain)
+    profileStore.update({ preferences: { blockedDomains: blockedDomains.value } })
+  }
+  newBlockedDomain.value = ''
+}
+
+function removeBlockedDomain(idx) {
+  blockedDomains.value.splice(idx, 1)
+  profileStore.update({ preferences: { blockedDomains: blockedDomains.value } })
+}
+
+function confirmReset() {
+  if (confirm('Are you sure you want to reset all settings?')) {
+    profileStore.reset()
+    profileStore.refresh()
+    blockedDomains.value = []
+    tempGoal.value = 30
+    alert('Settings reset to defaults.')
+  }
+}
+
 async function syncHistory() {
   if (typeof chrome === 'undefined' || !chrome.history) {
-    alert('Browser history API not available (are you running as an extension?).')
-    return
+    alert('Browser history API not available (are you running as an extension?).');
+    return;
   }
 
-  const apiKey = profileStore.profile?.preferences?.apiKey
-  if (!apiKey) {
-    showApiKeyModal.value = true
-    return
-  }
-
-  isSyncing.value = true
+  isSyncing.value = true;
   try {
     const results = await chrome.history.search({ 
       text: '', 
       maxResults: 150, 
       startTime: Date.now() - 7 * 24 * 3600 * 1000 
-    })
-    
-    let aiClassifications = {}
-    const apiKey = profileStore.profile?.preferences?.apiKey
-    if (apiKey) {
-       aiClassifications = await batchClassifyLinks(results, apiKey)
-    }
-    
-    const newVisits = results.map(item => {
-      let cat = aiClassifications[item.url]
-      let confidence = 0.9
-      if (!cat) {
-        cat = CATEGORIES.UNKNOWN
-      }
+    });
+
+    // 1. Initial Rule-Based Categorization
+    const initialVisits = results.map(item => {
+      const ruleResult = categorize(item.url, item.title);
       return {
         url: item.url,
         title: item.title,
         timestamp: new Date(item.lastVisitTime || Date.now()).toISOString(),
         timeSpent: 0,
-        category: cat,
-        confidence: confidence
-      }
-    })
+        category: ruleResult.category,
+        confidence: ruleResult.confidence,
+        needsAi: needsAiFallback(ruleResult)
+      };
+    });
 
-    storage.set(KEYS.VISITS, newVisits)
-    visits.value = newVisits
+    // 2. Identify links that need AI classification
+    const linksToClassify = initialVisits.filter(v => v.needsAi).map(v => ({ url: v.url, title: v.title }));
+    
+    let aiResults = {};
+    const apiKey = profileStore.profile?.preferences?.apiKey;
+    
+    if (apiKey && linksToClassify.length > 0) {
+      aiResults = await batchClassifyLinks(linksToClassify, apiKey);
+    }
+
+    // 3. Final Merge
+    const finalVisits = initialVisits.map(v => {
+      if (v.needsAi && aiResults[v.url]) {
+        return { ...v, category: aiResults[v.url], confidence: 0.9, source: 'ai' };
+      }
+      return v;
+    });
+
+    storage.set(KEYS.VISITS, finalVisits);
+    visits.value = finalVisits;
   } catch (err) {
-    console.error('Failed to sync history:', err)
+    console.error('Failed to sync history:', err);
   } finally {
-    isSyncing.value = false
+    isSyncing.value = false;
   }
 }
 
-// Group visits by category
+// Group visits by category and aggregate identical ones
 const groupedVisits = computed(() => {
   const groups = {}
+  if (!visits.value || !Array.isArray(visits.value)) return groups;
+
   visits.value.forEach(visit => {
+    if (!visit) return
     const cat = visit.category || CATEGORIES.UNKNOWN
     if (!groups[cat]) groups[cat] = []
-    groups[cat].push(visit)
+    
+    // Aggregate by domain and title to avoid repetition
+    const existing = groups[cat].find(v => v.url === visit.url || (v.title === visit.title && v.title))
+    if (existing) {
+      existing.count = (existing.count || 1) + 1
+    } else {
+      groups[cat].push({ ...visit, count: 1 })
+    }
   })
+  
+  // Sort groups by count descending
+  Object.keys(groups).forEach(cat => {
+    groups[cat].sort((a, b) => (b.count || 0) - (a.count || 0))
+  })
+  
   return groups
 })
 
@@ -167,15 +223,6 @@ async function generateSummary(category) {
     isSummarizing.value[category] = false
   }
 }
-
-function saveApiKey() {
-  if (tempApiKey.value.trim()) {
-    profileStore.setPreference('apiKey', tempApiKey.value.trim())
-    showApiKeyModal.value = false
-    tempApiKey.value = ''
-    alert('API Key saved successfully!')
-  }
-}
 </script>
 
 <template>
@@ -203,42 +250,78 @@ function saveApiKey() {
     <!-- Overview Tab -->
     <div v-if="activeTab === 'overview'" class="space-y-6 animate-fade-in">
       <!-- Stats Grid -->
-      <div class="grid lg:grid-cols-4 gap-6 mb-8">
-        <div class="lg:col-span-1">
-          <FrictionProfile />
-        </div>
-        <div class="lg:col-span-1">
-          <div class="glass-card p-6 h-full flex flex-col justify-center">
-            <h2 class="text-sm font-medium text-text-muted uppercase tracking-wider mb-2">Today's Focus</h2>
-            <div class="text-4xl font-bold text-text-primary">{{ activityStore.todayBrainrotScore }}%</div>
-            <div class="text-xs text-text-muted mt-2">Brainrot Ratio</div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="glass-card p-5 group hover:border-primary/30 transition-all cursor-pointer">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-text-muted uppercase tracking-wider">Focus Score</span>
+            <span class="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+              <svg class="w-4 h-4 text-primary-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+              </svg>
+            </span>
+          </div>
+          <div class="text-3xl font-bold text-text-primary">{{ 100 - activityStore.todayBrainrotScore }}%</div>
+          <div class="text-xs text-text-muted mt-1 group-hover:text-primary-light transition-colors">
+            {{ activityStore.todayBrainrotScore > 50 ? 'Needs improvement' : 'Great focus!' }}
           </div>
         </div>
-        <div class="lg:col-span-1">
-          <div class="glass-card p-6 h-full flex flex-col justify-center">
-            <h2 class="text-sm font-medium text-text-muted uppercase tracking-wider mb-2">Total Reels</h2>
-            <div class="text-4xl font-bold text-primary-light">{{ activityStore.totalReels }}</div>
-            <div class="text-xs text-text-muted mt-2">Watched Today</div>
+        
+        <div class="glass-card p-5 group hover:border-danger/30 transition-all cursor-pointer">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-text-muted uppercase tracking-wider">Brainrot</span>
+            <span class="w-8 h-8 rounded-lg bg-danger/20 flex items-center justify-center">
+              <svg class="w-4 h-4 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 14l2 4 2-4H8zm8 2a4 4 0 11-8 0 4 4 0 018 0z"/>
+              </svg>
+            </span>
           </div>
+          <div class="text-3xl font-bold text-danger">{{ activityStore.todayBrainrotScore }}%</div>
+          <div class="text-xs text-text-muted mt-1">Time in void</div>
         </div>
-        <div class="lg:col-span-1">
-          <div class="glass-card p-6 h-full flex flex-col justify-center">
-            <h2 class="text-sm font-medium text-text-muted uppercase tracking-wider mb-2">Active Sessions</h2>
-            <div class="text-4xl font-bold text-secondary">{{ activityStore.sessions.length }}</div>
-            <div class="text-xs text-text-muted mt-2">Today</div>
+        
+        <div class="glass-card p-5 group hover:border-accent/30 transition-all cursor-pointer">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-text-muted uppercase tracking-wider">Reels</span>
+            <span class="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
+              <svg class="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+              </svg>
+            </span>
           </div>
+          <div class="text-3xl font-bold text-accent">{{ activityStore.reelCount }}</div>
+          <div class="text-xs text-text-muted mt-1">Watched today</div>
+        </div>
+        
+        <div class="glass-card p-5 group hover:border-warning/30 transition-all cursor-pointer">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-medium text-text-muted uppercase tracking-wider">Time</span>
+            <span class="w-8 h-8 rounded-lg bg-warning/20 flex items-center justify-center">
+              <svg class="w-4 h-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </span>
+          </div>
+          <div class="text-3xl font-bold text-warning">{{ Math.floor(activityStore.reelTime / 60) }}m</div>
+          <div class="text-xs text-text-muted mt-1">In the void</div>
         </div>
       </div>
 
-      <div class="grid lg:grid-cols-4 gap-6">
-        <div class="lg:col-span-2">
+      <!-- Charts Grid -->
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div class="lg:col-span-1">
           <BrainrotChart />
         </div>
-        <div class="lg:col-span-2">
+        <div class="lg:col-span-1">
           <HourlyReelsChart />
         </div>
+      </div>
+      
+      <div class="grid lg:grid-cols-3 gap-6">
         <div class="lg:col-span-1">
           <ReasonsChart />
+        </div>
+        <div class="lg:col-span-2">
+          <FrictionProfile />
         </div>
       </div>
     </div>
@@ -266,6 +349,143 @@ function saveApiKey() {
         <div class="h-[500px]">
           <AnalyticsMindMap :visits="visits" />
         </div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div v-if="activeTab === 'settings'" class="space-y-6 animate-fade-in">
+      <h2 class="text-lg font-semibold text-text-primary">Settings</h2>
+      
+      <!-- Friction Level -->
+      <div class="glass-card p-6 space-y-4">
+        <h3 class="font-semibold text-text-primary flex items-center gap-2">
+          <svg class="w-5 h-5 text-primary-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          Friction Level
+        </h3>
+        <p class="text-sm text-text-muted">Higher friction makes brainrot sites harder to consume.</p>
+        
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-text-secondary">Tolerance Level</span>
+            <span class="text-lg font-bold text-primary-light">{{ profileStore.frictionTolerance }}</span>
+          </div>
+          <input 
+            type="range" 
+            min="1" 
+            max="5" 
+            :value="profileStore.frictionTolerance"
+            @input="(e) => { profileStore.update({ behavior: { frictionTolerance: parseInt(e.target.value) } }); profileStore.refresh(); }"
+            class="w-full h-2 bg-surface-700 rounded-lg appearance-none cursor-pointer accent-primary"
+          />
+          <div class="flex justify-between text-[10px] text-text-muted">
+            <span>1 - Gentle</span>
+            <span>3 - Moderate</span>
+            <span>5 - Heavy</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Personality -->
+      <div class="glass-card p-6 space-y-4">
+        <h3 class="font-semibold text-text-primary flex items-center gap-2">
+          <svg class="w-5 h-5 text-primary-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/>
+          </svg>
+          AI Coach Personality
+        </h3>
+        
+        <div class="grid grid-cols-3 gap-3">
+          <button 
+            v-for="toneOption in ['empathetic', 'firm', 'direct']"
+            :key="toneOption"
+            @click="profileStore.updateTone(toneOption)"
+            class="p-3 rounded-lg border transition-all text-center"
+            :class="profileStore.tone === toneOption 
+              ? 'bg-primary/20 border-primary text-primary-light' 
+              : 'bg-white/5 border-white/10 text-text-secondary hover:bg-white/10'"
+          >
+            <span class="capitalize text-sm font-medium">{{ toneOption }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Goals -->
+      <div class="glass-card p-6 space-y-4">
+        <h3 class="font-semibold text-text-primary flex items-center gap-2">
+          <svg class="w-5 h-5 text-primary-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Daily Goal
+        </h3>
+        
+        <div class="space-y-3">
+          <div class="flex items-center gap-4">
+            <input 
+              type="number" 
+              v-model.number="tempGoal"
+              class="w-20 bg-surface-900 border border-white/10 rounded-lg px-3 py-2 text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
+              min="0" 
+              max="100"
+            />
+            <span class="text-text-secondary">% brainrot target</span>
+          </div>
+          <button 
+            @click="saveGoal"
+            class="px-4 py-2 bg-primary/20 hover:bg-primary/30 text-primary-light text-sm font-medium rounded-lg transition-colors"
+          >
+            Save Goal
+          </button>
+        </div>
+      </div>
+
+      <!-- Blocklist -->
+      <div class="glass-card p-6 space-y-4">
+        <h3 class="font-semibold text-text-primary flex items-center gap-2">
+          <svg class="w-5 h-5 text-primary-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+          </svg>
+          Blocked Domains
+        </h3>
+        
+        <div class="flex gap-2">
+          <input 
+            v-model="newBlockedDomain"
+            type="text" 
+            placeholder="add domain..."
+            class="flex-1 bg-surface-900 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            @keyup.enter="addBlockedDomain"
+          />
+          <button 
+            @click="addBlockedDomain"
+            class="px-4 py-2 bg-primary/20 hover:bg-primary/30 text-primary-light text-sm font-medium rounded-lg transition-colors"
+          >
+            Add
+          </button>
+        </div>
+        
+        <div class="flex flex-wrap gap-2">
+          <span 
+            v-for="(domain, idx) in blockedDomains" 
+            :key="idx"
+            class="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-300 rounded-full text-xs"
+          >
+            {{ domain }}
+            <button @click="removeBlockedDomain(idx)" class="hover:text-red-100">&times;</button>
+          </span>
+          <span v-if="blockedDomains.length === 0" class="text-text-muted text-sm">No blocked domains</span>
+        </div>
+      </div>
+
+      <!-- Reset -->
+      <div class="glass-card p-6">
+        <button 
+          @click="confirmReset"
+          class="w-full px-4 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm font-medium rounded-lg transition-colors"
+        >
+          Reset All Settings
+        </button>
       </div>
     </div>
 
@@ -335,9 +555,12 @@ function saveApiKey() {
                 :key="idx"
                 :href="visit.url"
                 target="_blank"
-                class="block p-1.5 rounded hover:bg-white/5 text-[11px] text-text-muted truncate transition-colors"
+                class="group flex items-center justify-between p-1.5 rounded hover:bg-white/5 text-[11px] text-text-muted transition-colors"
               >
-                {{ visit.title || visit.url }}
+                <span class="truncate pr-2">{{ visit.title || visit.url }}</span>
+                <span v-if="visit.count > 1" class="shrink-0 px-1.5 py-0.5 rounded-full bg-white/5 text-[9px] group-hover:bg-primary/20 group-hover:text-primary-light transition-colors">
+                  {{ visit.count }}
+                </span>
               </a>
             </div>
           </div>

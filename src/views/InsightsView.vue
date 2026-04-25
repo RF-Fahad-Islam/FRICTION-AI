@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useProfileStore } from '../stores/profileStore.js'
 import { useActivityStore } from '../stores/activityStore.js'
+import BlockBypassChart from '../components/BlockBypassChart.vue'
 
 const profileStore = useProfileStore()
 const activityStore = useActivityStore()
@@ -83,6 +84,13 @@ const insightIcons = { warning: '⚠', success: '✓', info: 'ℹ' }
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Block Bypass Stats -->
+    <div class="glass-card p-6">
+      <h2 class="text-lg font-semibold text-text-primary mb-4">Block Bypass Analysis</h2>
+      <p class="text-sm text-text-muted mb-4">See which blocked sites you've accessed and why.</p>
+      <BlockBypassChart />
     </div>
 
     <!-- Preferences -->

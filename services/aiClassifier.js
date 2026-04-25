@@ -121,36 +121,51 @@ function parseJsonSafe(text) {
 export async function batchClassifyLinks(links, apiKey = null) {
   if (!apiKey || links.length === 0) return {};
   
+  const BATCH_SIZE = 40;
+  let allAiResults = {};
+
   try {
-    const prompt = batchClassifyPrompt(links.map(l => ({ url: l.url, title: l.title })));
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(prompt),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) throw new Error(`API ${res.status}`);
-    
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    let parsed = {};
-    try {
-      parsed = parseJsonSafe(text);
-    } catch (e) {
-      console.warn('[Classifier] Batch JSON parse failed:', e.message);
-      return {};
-    }
-    
-    // Convert array to URL -> Category map
-    const map = {};
-    if (parsed.classifications && Array.isArray(parsed.classifications)) {
-      parsed.classifications.forEach(c => {
-        if (c.url && c.category) map[c.url] = c.category;
+    for (let i = 0; i < links.length; i += BATCH_SIZE) {
+      const batch = links.slice(i, i + BATCH_SIZE);
+      const linksWithIds = batch.map((l, index) => ({ id: index + 1, url: l.url, title: l.title }));
+      const prompt = batchClassifyPrompt(linksWithIds);
+      
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prompt),
+        signal: AbortSignal.timeout(15000),
       });
+      
+      if (!res.ok) {
+        console.warn(`[Classifier] Batch API failed at index ${i}: ${res.status}`);
+        continue;
+      }
+      
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      let parsed = {};
+      try {
+        parsed = parseJsonSafe(text);
+      } catch (e) {
+        console.warn('[Classifier] Batch JSON parse failed at index', i);
+        continue;
+      }
+      
+      if (parsed.classifications && Array.isArray(parsed.classifications)) {
+        parsed.classifications.forEach(c => {
+          if (c.id !== undefined && c.category) {
+            const originalLink = linksWithIds.find(l => l.id === Number(c.id));
+            if (originalLink) {
+              allAiResults[originalLink.url] = c.category;
+            }
+          }
+        });
+      }
     }
-    return map;
+    return allAiResults;
   } catch (err) {
     console.warn('[Classifier] Batch classification failed:', err.message);
-    return {};
+    return allAiResults;
   }
 }
