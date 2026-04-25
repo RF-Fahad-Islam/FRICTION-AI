@@ -21,6 +21,7 @@ export const KEYS = {
   HOURLY_REELS: `${STORAGE_PREFIX}hourly_reels`,
   HOURLY_METRICS: `${STORAGE_PREFIX}hourly_metrics`,
   HISTORY_SCORES: `${STORAGE_PREFIX}history_scores`,
+  DAILY_ACTIVITY: `${STORAGE_PREFIX}daily_activity`,
 };
 
 /** Max items per collection to prevent localStorage bloat */

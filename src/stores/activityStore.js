@@ -15,14 +15,7 @@ export const useActivityStore = defineStore('activity', () => {
     // Prefer storageAdapter to handle both localStorage and chrome.storage
     reelTime.value = get(KEYS.REEL_TIME, 0)
     reelCount.value = get(KEYS.REEL_COUNT, 0)
-    dailyActivity.value = get(KEYS.VISITS, {}) // Note: visits used for daily_activity in adapter mapping
-    
-    // Check if we need to use direct keys if mapping is different
-    // In activityStore original, it used: sf_reel_time, sf_daily_activity, sf_reel_count, sf_hourly_reels, sf_history_scores, sf_sessions, sf_hourly_metrics
-    // Let's use the explicit KEYS we just added
-    reelTime.value = get(KEYS.REEL_TIME, 0)
-    reelCount.value = get(KEYS.REEL_COUNT, 0)
-    dailyActivity.value = get('sf_daily_activity', {}) 
+    dailyActivity.value = get(KEYS.DAILY_ACTIVITY, {}) 
     hourlyReels.value = get(KEYS.HOURLY_REELS, {})
     hourlyMetrics.value = get(KEYS.HOURLY_METRICS, {})
     sessions.value = get(KEYS.SESSIONS, [])
