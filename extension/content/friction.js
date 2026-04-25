@@ -67,6 +67,7 @@
         checkIntentIntercept();
       } else {
         document.body.classList.remove('sf-hide-interactions');
+        window.dispatchEvent(new CustomEvent('sf-friction-deactivate'));
       }
     }
   };

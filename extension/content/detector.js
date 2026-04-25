@@ -193,6 +193,12 @@
   // Proactive initialization for first-load race conditions
   setTimeout(() => {
     if (!isActive) {
+      const path = location.pathname;
+      const isReel = path.includes('/reels/') || path.includes('/reel/') || path.includes('/watch') || path.includes('/shorts/') || location.hostname.includes('tiktok.com');
+      
+      // Abort self-activation if we are not explicitly on a reel path
+      if (!isReel) return; 
+
       try {
         chrome.runtime.sendMessage(
           { type: 'GET_FRICTION_CONFIG', payload: { url: location.href } },
