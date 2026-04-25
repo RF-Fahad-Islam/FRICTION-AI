@@ -1,51 +1,82 @@
-# 🚀 Study Friction AI — Pomodoro Attention OS
+# 🚀 Study Friction AI — Attention OS
 
-Study Friction AI is a local-first browser extension and Vue 3 dashboard designed to actively reshape user attention through adaptive "friction" and intelligent Pomodoro tracking. Unlike typical site blockers that just block websites, this system implements dynamic interventions—like scroll delays, warning overlays, and intent popups—that adapt based on your focus history and AI-driven insights.
+Study Friction AI is a local-first browser extension and AI-powered dashboard designed to actively reshape user attention through **Adaptive Friction** and intelligent behavioral coaching. Unlike typical site blockers that just block websites, this system implements dynamic interventions—like scroll delays, dopamine desaturation, and intent popups—that build self-regulation rather than just reliance on a blocklist.
+
+---
 
 ## ✨ Core Features
-*   **Adaptive Friction Engine:** Instead of hard-blocking, it introduces measured resistance (e.g., scroll delays or popups) when you enter "brainrot" patterns on social media. The friction scales from 1 to 5 based on your profile and recent distraction metrics.
-*   **AI Coach & Classification:** Integrates with the Google Gemini API to intelligently classify unknown URLs and provide personalized coaching via the chat interface. (Configurable in the UI settings with your API key).
-*   **Pomodoro OS:** Built-in Pomodoro timers that sync your browsing behavior to your focus states, assigning "Focus Scores" and "Brainrot Scores" based on actual behavioral data gathered during the session.
-*   **Insight Dashboard:** A sleek, glassmorphic dark-themed Vue 3 dashboard tracking your productivity trends over the week.
 
-## 📁 System Architecture
-The application is structured into two main parts:
-1.  **Vue.js Dashboard (`src/`):** Built with Vue 3, Vite, Pinia, Tailwind CSS v4, and Chart.js. This serves as the "Attention OS" where you manage your sessions, view insights, and chat with the AI coach.
-2.  **Chrome Extension (`extension/`):** Built with Manifest V3. Content scripts monitor scrolling and time spent on addictive sites, communicating with a background worker to apply UI overlays (friction).
+### 🧠 AI Focus Coach
+The central interface for behavioral change. It's a data-aware mentor that knows your habits better than you do.
+- **Context-Aware Advice**: Analyzes your browsing patterns, time spent, and "brainrot" scores to provide firm but empathetic guidance.
+- **Data Integration**: The coach sees your real-time stats and block bypass reasons to tailor its coaching.
+- **Powered by Gemini**: Uses Gemini 1.5 Flash for high-impact, concise coaching (requires API key).
 
-### Logic & Services (`logic/`, `services/`, `storage/`, `profile/`)
-The core engines are cleanly decoupled from the UI:
-*   `logic/pomodoroEngine.js` manages session states and focus scoring.
-*   `logic/adaptiveFriction.js` and `logic/brainrotScorer.js` determine intervention levels.
-*   `services/aiChat.js` and `services/aiClassifier.js` handle requests to the Gemini API (with robust local fallbacks).
-*   `storage/storageAdapter.js` provides a unified local storage layer (easily extendable to cloud databases like Supabase).
+### ⚡ Study Friction Engine
+A collection of psychological interventions that make distracting content "harder" to consume.
+- **Dynamic Scroll Resistance**: Intercepts scrolling on addictive sites, requiring physical effort (measured delta) to move to the next piece of content.
+- **Grayscale Desaturation**: Gradually turns the page black-and-white as you linger on distracting sites, reducing visual dopamine rewards.
+- **Intent Intercepts**: Periodic popups that break the "doomscrolling trance" by asking for your current intention.
+- **Soft Blocking**: Instead of hard-locking, it offers timed bypasses with required justification (e.g., "Productive Task", "Quick Check").
 
-## 🛠️ Setup & Local Development
+### 📊 Intelligence Dashboard
+A sleek, glassmorphic Vue 3 application for long-term behavioral tracking.
+- **Focus Score**: A composite metric representing your daily success.
+- **Interest Mind Map**: An AI-generated visualization of your browsing interests.
+- **Categorized History**: Automatically groups 150+ sites into logical categories (Learning, Time Waste, Brainrot, etc.) using AI batch classification.
+- **Block Analytics**: Visualizes which blocked sites you've accessed and the reasons you gave.
 
-### 1. Run the Vue Dashboard
-Install dependencies and run the Vite dev server:
+---
+
+## 🛠️ Setup & Installation
+
+### 1. Run the Dashboard (Vue.js)
+The dashboard is built with Vue 3 and Vite.
 ```bash
+# Navigate to the project root
 npm install
 npm run dev
 ```
 The dashboard will be available at `http://localhost:5173`.
 
 ### 2. Install the Chrome Extension
-1. Open Chrome and go to `chrome://extensions/`.
-2. Enable **Developer mode** (toggle in the top right).
+1. Open Chrome and navigate to `chrome://extensions/`.
+2. Enable **Developer mode** (top right toggle).
 3. Click **Load unpacked**.
 4. Select the `extension/` folder from this repository.
-5. Click the extension icon in your browser toolbar to view the popup, which links to your local dashboard.
+5. Pin the extension for easy access to the popup and dashboard.
 
 ### 3. Enable AI Features
-1. Go to Google AI Studio and get a **Gemini API Key**.
-2. Open the **AI Coach** tab in the dashboard.
-3. Enter your API Key in the settings (gear icon) to unlock smart classification and personalized coaching. If no key is provided, the system gracefully degrades to using local heuristics and fallback templates.
+1. Obtain a **Gemini API Key** from [Google AI Studio](https://aistudio.google.com/).
+2. Open the **Dashboard** -> **Settings**.
+3. Enter your API Key to unlock AI-powered categorization and coaching.
+
+---
+
+## 📁 Project Structure
+
+| Directory | Purpose |
+| :--- | :--- |
+| `extension/` | **The Engine**: Content scripts (`friction.js`), detector, and manifest. |
+| `src/` | **The Dashboard**: Vue 3 application, stores, and UI components. |
+| `storage/` | **The Bridge**: `storageAdapter.js` for real-time sync between Extension and Dashboard. |
+| `services/` | **The Brain**: AI Prompts, Gemini integration, and batch classifiers. |
+| `logic/` | **The Logic**: Scoring algorithms, categorizers, and friction calculators. |
+
+---
 
 ## 🎨 Tech Stack
-*   **Frontend:** Vue 3, Vite, Tailwind CSS v4
-*   **State Management:** Pinia
-*   **Routing:** Vue Router
-*   **Charts:** Chart.js
-*   **AI Integration:** Google Gemini API (gemini-2.5-flash)
-*   **Extension:** Chrome Manifest V3
+- **Frontend**: Vue 3, Pinia, Vite, Tailwind CSS v4
+- **Charts**: Chart.js, Vue-ECharts
+- **AI**: Google Gemini 1.5 Flash
+- **Extension**: Manifest V3 (Service Workers, Content Scripts)
+
+---
+
+## 📄 Documentation
+For a deep dive into the architecture and algorithms, see:
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - System design and data flow.
+- [FRICTION_ENGINE.md](./FRICTION_ENGINE.md) - Details on the psychological intervention logic.
+
+---
+*Built for the Friction Hackathon — Reclaiming attention, one scroll at a time.*
