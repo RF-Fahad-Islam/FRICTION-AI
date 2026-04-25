@@ -42,13 +42,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
       
-      let brainrotScore = 0;
-      if (totalTime > 0) {
-        brainrotScore = Math.round((brainrotTime / totalTime) * 100);
-      }
+      const DAILY_LIMIT_SECONDS = 3600; // 1 hour limit
+      
+      let brainrotScore = Math.min(Math.round((brainrotTime / DAILY_LIMIT_SECONDS) * 100), 100);
+      let focusScore = Math.max(0, 100 - brainrotScore);
       
       document.getElementById('brainrotScore').textContent = `${brainrotScore}%`;
-      document.getElementById('focusScore').textContent = `${Math.max(0, 100 - brainrotScore)}%`;
+      document.getElementById('focusScore').textContent = `${focusScore}%`;
     });
   }
   

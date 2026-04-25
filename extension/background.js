@@ -11,7 +11,7 @@ const BRAINROT_PATTERNS = [
   { pattern: /twitter\.com/, score: 25 },
   { pattern: /x\.com/, score: 25 },
   { pattern: /reddit\.com/, score: 20 },
-  { pattern: /facebook.com/(reel|reels|watch)/, score: 40 },
+  { pattern: /facebook\.com\/(reel|reels|watch)/, score: 40 },
 ];
 
 // Listen for messages from content scripts
