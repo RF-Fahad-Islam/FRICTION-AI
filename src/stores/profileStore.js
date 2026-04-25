@@ -4,6 +4,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getProfile, updateProfile, resetProfile, getProfileSummary } from '../../profile/profileManager.js'
+import { KEYS } from '../../storage/storageAdapter.js'
 
 export const useProfileStore = defineStore('profile', () => {
   const profile = ref(getProfile())
@@ -21,6 +22,15 @@ export const useProfileStore = defineStore('profile', () => {
   }
   function updateTone(newTone) {
     profile.value = updateProfile({ preferences: { tone: newTone } })
+  }
+
+  // Reactive storage listener
+  if (typeof window !== 'undefined') {
+    window.addEventListener('sf_storage_updated', (e) => {
+      if (e.detail.key === KEYS.PROFILE) {
+        profile.value = e.detail.newValue
+      }
+    })
   }
 
   return { profile, frictionTolerance, brainrotRate, tone, summary, refresh, update, reset, setPreference, updateTone }

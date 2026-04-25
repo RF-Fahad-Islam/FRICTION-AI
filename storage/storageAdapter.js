@@ -16,6 +16,11 @@ export const KEYS = {
   CHAT_HISTORY: `${STORAGE_PREFIX}chat_history`,
   CHAT_MEMORY: `${STORAGE_PREFIX}chat_memory`,
   SETTINGS: `${STORAGE_PREFIX}settings`,
+  REEL_TIME: `${STORAGE_PREFIX}reel_time`,
+  REEL_COUNT: `${STORAGE_PREFIX}reel_count`,
+  HOURLY_REELS: `${STORAGE_PREFIX}hourly_reels`,
+  HOURLY_METRICS: `${STORAGE_PREFIX}hourly_metrics`,
+  HISTORY_SCORES: `${STORAGE_PREFIX}history_scores`,
 };
 
 /** Max items per collection to prevent localStorage bloat */
@@ -105,7 +110,8 @@ export function append(key, item) {
 export async function syncFromChrome() {
   if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
 
-  return new Promise((resolve) => {
+  // Initial sync
+  await new Promise((resolve) => {
     chrome.storage.local.get(null, (data) => {
       Object.entries(data).forEach(([key, value]) => {
         if (key.startsWith(STORAGE_PREFIX)) {
@@ -114,6 +120,25 @@ export async function syncFromChrome() {
       });
       resolve();
     });
+  });
+
+  // Listen for future changes
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local') {
+      Object.entries(changes).forEach(([key, { newValue }]) => {
+        if (key.startsWith(STORAGE_PREFIX)) {
+          if (newValue === undefined) {
+            localStorage.removeItem(key);
+          } else {
+            localStorage.setItem(key, JSON.stringify(newValue));
+          }
+          
+          // Dispatch a storage event so other parts of the app can react
+          // (Storage events only fire on OTHER windows by default, so we might need to manually trigger a refresh)
+          window.dispatchEvent(new CustomEvent('sf_storage_updated', { detail: { key, newValue } }));
+        }
+      });
+    }
   });
 }
 
