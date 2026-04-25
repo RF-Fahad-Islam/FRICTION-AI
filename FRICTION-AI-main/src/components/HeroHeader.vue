@@ -1,15 +1,7 @@
 <script setup>
-import { Play, Download, Apple } from 'lucide-vue-next'
+import { Play, Apple } from 'lucide-vue-next'
 import Button from './ui/button/Button.vue'
-
-function downloadExtension() {
-  const link = document.createElement('a');
-  link.href = '/extension.zip';
-  link.download = 'extension.zip';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+import { downloadAndShowGuide } from '../state'
 </script>
 
 <template>
@@ -67,7 +59,7 @@ function downloadExtension() {
       </p>
       
       <div class="flex flex-col sm:flex-row items-center gap-4">
-        <Button @click="downloadExtension" size="lg" class="rounded-full bg-gray-900 hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 px-8 py-6 text-lg w-full sm:w-auto h-auto flex gap-2">
+        <Button @click="downloadAndShowGuide" size="lg" class="rounded-full bg-gray-900 hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 px-8 py-6 text-lg w-full sm:w-auto h-auto flex gap-2">
           <Apple class="w-5 h-5" />
           Download Extension
         </Button>
