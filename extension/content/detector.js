@@ -12,9 +12,46 @@
   let frictionConfig = null;
   let isActive = false;
   let checkInterval = null;
-  
+  let currentUrl = location.href;
+
   function isContextValid() {
     return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
+  }
+
+  const videoObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        handleNewReel();
+        videoObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.5 });
+
+  const urlObserver = new MutationObserver(() => {
+    if (location.href !== currentUrl) {
+      currentUrl = location.href;
+      handleNewReel();
+    }
+    
+    // Observe new video elements
+    document.querySelectorAll('video:not([data-sf-observed])').forEach(v => {
+      v.setAttribute('data-sf-observed', 'true');
+      videoObserver.observe(v);
+    });
+  });
+
+  function handleNewReel() {
+    scrollCount++;
+    lastScrollTime = Date.now();
+    if (isContextValid()) {
+      chrome.runtime.sendMessage({ type: 'REEL_WATCHED' });
+    }
+
+    if (scrollCount === 15) {
+      window.dispatchEvent(new CustomEvent('sf-brainrot-alert', {
+        detail: { score: 100, scrollCount, timeSpent: 0, forceIntent: true },
+      }));
+    }
   }
 
   // Listen for activation from background
@@ -31,6 +68,7 @@
     isActive = true;
     startTime = Date.now();
     scrollCount = 0;
+    currentUrl = location.href;
 
     // Get friction config from background
     if (isContextValid()) {
@@ -46,10 +84,14 @@
       );
     }
 
-    // Monitor scrolling (use capture so friction.js doesn't hide it)
-    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
-    window.addEventListener('wheel', onWheel, { passive: true, capture: true });
-    document.addEventListener('touchmove', onScroll, { passive: true, capture: true });
+    // Start observing URL changes and video nodes
+    urlObserver.observe(document.body, { childList: true, subtree: true });
+    
+    // Catch existing videos
+    document.querySelectorAll('video:not([data-sf-observed])').forEach(v => {
+      v.setAttribute('data-sf-observed', 'true');
+      videoObserver.observe(v);
+    });
 
     // Periodic brainrot check
     checkInterval = setInterval(checkBrainrot, 10000); // every 10s
@@ -58,24 +100,14 @@
   function deactivate() {
     if (!isActive) return;
     isActive = false;
-    window.removeEventListener('scroll', onScroll, { capture: true });
-    window.removeEventListener('wheel', onWheel, { capture: true });
-    document.removeEventListener('touchmove', onScroll, { capture: true });
+    urlObserver.disconnect();
+    videoObserver.disconnect();
+    
     if (checkInterval) {
       clearInterval(checkInterval);
       checkInterval = null;
     }
     window.dispatchEvent(new CustomEvent('sf-friction-deactivate'));
-  }
-
-  function onScroll() {
-    scrollCount++;
-    lastScrollTime = Date.now();
-  }
-
-  function onWheel() {
-    scrollCount++;
-    lastScrollTime = Date.now();
   }
 
   function checkBrainrot() {

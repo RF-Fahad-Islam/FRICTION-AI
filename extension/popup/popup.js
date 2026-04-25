@@ -22,16 +22,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 2. Fetch stats from storage periodically
   function updateStats() {
-    chrome.storage.local.get(['sf_daily_activity', 'sf_reel_time'], (data) => {
+    chrome.storage.local.get(['sf_daily_activity', 'sf_reel_time', 'sf_reels_watched'], (data) => {
       const activity = data.sf_daily_activity || {};
       const reelTime = data.sf_reel_time || 0;
+      const reelsWatched = data.sf_reels_watched || 0;
       
       const mins = Math.floor(reelTime / 60).toString().padStart(2, '0');
       const secs = (reelTime % 60).toString().padStart(2, '0');
       document.getElementById('reelTime').textContent = `${mins}:${secs}`;
       
-      const trackedSitesCount = Object.keys(activity).length;
-      document.getElementById('trackedCount').textContent = trackedSitesCount;
+      document.getElementById('reelsWatched').textContent = reelsWatched;
       
       let brainrotTime = 0;
       let totalTime = 0;
