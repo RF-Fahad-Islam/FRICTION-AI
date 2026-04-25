@@ -2,6 +2,7 @@
 import Card from './ui/card/Card.vue'
 import IntentInterceptDemo from './IntentInterceptDemo.vue'
 import TransparencyDemo from './TransparencyDemo.vue'
+import AnalyticsDemo from './AnalyticsDemo.vue'
 </script>
 
 <template>
@@ -32,6 +33,21 @@ import TransparencyDemo from './TransparencyDemo.vue'
         </div>
         <div class="md:w-1/2 bg-red-50 flex items-center justify-center p-8">
           <TransparencyDemo />
+        </div>
+      </div>
+    </Card>
+
+    <!-- Card 5: Deep Analytics (Demo Left, Text Right) -->
+    <Card class="w-full max-w-5xl rounded-3xl overflow-hidden border-2 border-transparent hover:border-cyan-500 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-cyan-500/20 group relative bg-white">
+      <div class="flex flex-col md:flex-row relative z-10">
+        <div class="p-12 md:w-1/2 flex flex-col justify-center">
+          <h2 class="text-4xl font-serif font-bold text-gray-900 mb-6">Deep Analytics</h2>
+          <p class="text-lg text-gray-600 mb-8 leading-relaxed">
+            Stop flying blind. Visualize your attention with composite Focus Scores, brainrot intensity maps, and AI-generated interest clusters that show you exactly where your time is going.
+          </p>
+        </div>
+        <div class="md:w-1/2 bg-cyan-50 flex items-center justify-center p-8">
+          <AnalyticsDemo />
         </div>
       </div>
     </Card>

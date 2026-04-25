@@ -24,7 +24,7 @@
       <div class="p-8 border border-gray-800 rounded-3xl bg-gray-800/50 backdrop-blur">
         <h3 class="text-2xl font-bold mb-4">Stop the leak today.</h3>
         <p class="text-gray-300 mb-8 max-w-2xl mx-auto">
-          Every swipe is a micro-decision that drains your cognitive battery. Reclaim Attention installs friction where it matters, so flow happens where it counts.
+          Every swipe is a micro-decision that drains your cognitive battery. Study Friction AI installs friction where it matters, so flow happens where it counts.
         </p>
         <button class="bg-white text-gray-900 font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform shadow-xl shadow-white/10 text-lg">
           Download Extension

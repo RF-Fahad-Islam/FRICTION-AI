@@ -7,9 +7,9 @@ import Button from './ui/button/Button.vue'
     <div class="container mx-auto px-6 h-20 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
-          R
+          S
         </div>
-        <span class="text-2xl font-bold font-serif tracking-tight text-gray-900">Reclaim Attention</span>
+        <span class="text-2xl font-bold font-serif tracking-tight text-gray-900">Study Friction AI</span>
       </div>
       <nav class="hidden md:flex items-center gap-8">
         <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">How it Works</a>
