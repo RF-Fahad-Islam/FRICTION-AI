@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useProfileStore } from '../stores/profileStore.js'
 import { useActivityStore } from '../stores/activityStore.js'
 import BlockBypassChart from '../components/BlockBypassChart.vue'
@@ -11,9 +11,16 @@ const b = computed(() => profileStore.profile?.behavior || {})
 const p = computed(() => profileStore.profile?.preferences || {})
 const h = computed(() => profileStore.profile?.history || {})
 
+const dailyActivity = computed(() => activityStore.dailyActivity || {})
+const totalTime = computed(() => {
+  let total = 0
+  Object.values(dailyActivity.value).forEach(d => total += d.timeSpent || 0)
+  return total
+})
+
 const avgWeekScore = computed(() => {
   const scores = h.value.lastWeekScores || []
-  return scores.length > 0 ? Math.round(scores.reduce((a, c) => a + c, 0) / scores.length) : 0
+  return scores.length > 0 ? Math.round(scores.reduce((a, c) => a + c, 0) / scores.length) : activityStore.todayBrainrotScore || 0
 })
 
 const frictionStats = computed(() => {
@@ -28,13 +35,26 @@ const frictionStats = computed(() => {
 
 const insights = computed(() => {
   const list = []
-  if (b.value.brainrotRate > 0.6) list.push({ type: 'warning', text: `Your brainrot rate is high at ${Math.round(b.value.brainrotRate * 100)}%. Consider increasing friction.` })
-  else if (b.value.brainrotRate < 0.3) list.push({ type: 'success', text: `Great focus! Your brainrot rate is only ${Math.round(b.value.brainrotRate * 100)}%.` })
-  if (b.value.peakDistractionTime) list.push({ type: 'info', text: `You tend to get distracted during ${b.value.peakDistractionTime}. Friction is boosted during these hours.` })
-  if (b.value.focusPatterns?.includes('productive_morning')) list.push({ type: 'success', text: 'You\'re consistently productive in the mornings. Keep it up!' })
+  const brainrotScore = activityStore.todayBrainrotScore || 0
+  const highRisk = Object.entries(dailyActivity.value)
+    .filter(([_, d]) => d.isBrainrot)
+    .sort((a, b) => (b[1]?.timeSpent || 0) - (a[1]?.timeSpent || 0))
+    .slice(0, 3)
+
+  if (brainrotScore > 60) list.push({ type: 'warning', text: `Your brainrot rate is high at ${brainrotScore}%. Consider increasing friction.` })
+  else if (brainrotScore < 30) list.push({ type: 'success', text: `Great focus! Your brainrot rate is only ${brainrotScore}%.` })
+  
+  if (highRisk.length > 0) {
+    const topSite = highRisk[0][0]
+    const topTime = Math.round((highRisk[0][1]?.timeSpent || 0) / 60)
+    list.push({ type: 'warning', text: `Top brainrot site: ${topSite} (${topTime}m)` })
+  }
+
+  if (b.value.peakDistractionTime) list.push({ type: 'info', text: `You tend to get distracted during ${b.value.peakDistractionTime}.` })
+  if (b.value.focusPatterns?.includes('productive_morning')) list.push({ type: 'success', text: 'You\'re consistently productive in the mornings!' })
   if (b.value.highRiskSites?.length > 0) list.push({ type: 'warning', text: `High-risk sites: ${b.value.highRiskSites.join(', ')}` })
   if (frictionStats.value.obeyRate > 70) list.push({ type: 'success', text: `You respond well to friction (${frictionStats.value.obeyRate}% compliance).` })
-  if (list.length === 0) list.push({ type: 'info', text: 'Start using the app to generate personalized insights!' })
+  if (list.length === 0) list.push({ type: 'info', text: 'Start browsing to generate personalized insights!' })
   return list
 })
 
