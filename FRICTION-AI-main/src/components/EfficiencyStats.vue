@@ -1,12 +1,5 @@
 <script setup>
-function downloadExtension() {
-  const link = document.createElement('a');
-  link.href = '/extension.zip';
-  link.download = 'extension.zip';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+import { downloadAndShowGuide } from '../state'
 </script>
 
 <template>
@@ -34,7 +27,7 @@ function downloadExtension() {
         <p class="text-gray-300 mb-8 max-w-2xl mx-auto">
           Every swipe is a micro-decision that drains your cognitive battery. Study Friction AI installs friction where it matters, so flow happens where it counts.
         </p>
-        <button @click="downloadExtension" class="bg-white text-gray-900 font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform shadow-xl shadow-white/10 text-lg">
+        <button @click="downloadAndShowGuide" class="bg-white text-gray-900 font-bold px-8 py-4 rounded-full hover:scale-105 transition-transform shadow-xl shadow-white/10 text-lg">
           Download Extension
         </button>
       </div>
